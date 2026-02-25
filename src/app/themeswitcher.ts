@@ -30,7 +30,7 @@ export interface ThemeState {
   selector: 'theme-switcher',
   standalone: true,
   imports: [CommonModule, FormsModule, StyleClassModule, SelectButtonModule, ToggleSwitchModule],
-  template: ` <div class="card flex justify-end p-2 mb-4">
+  template: `
         <ul class="flex list-none m-0 p-0 gap-2 items-center">
             <li>
                 <button type="button" class="inline-flex w-8 h-8 p-0 items-center justify-center surface-0 dark:surface-800 border border-surface-200 dark:border-surface-600 rounded" (click)="onThemeToggler()">
@@ -88,7 +88,7 @@ export interface ThemeState {
                     <div class="flex-col justify-start items-start gap-2 inline-flex w-full">
                         <span class="text-sm font-medium">Preset</span>
                         <div class="inline-flex p-[0.28rem] items-start gap-[0.28rem] rounded-[0.71rem] border border-[#00000003] w-full">
-                            <p-selectbutton [options]="presets" [ngModel]="selectedPreset()" (ngModelChange)="onPresetChange($event)" [unselectable]="false" size="small" />
+                            <p-select-button [options]="presets" [ngModel]="selectedPreset()" (ngModelChange)="onPresetChange($event)" [unselectable]="false" size="small" />
                         </div>
                     </div>
                     <div class="inline-flex flex-col justify-start items-start gap-2 w-full pt-4 pb-2">
@@ -98,7 +98,7 @@ export interface ThemeState {
                 </div>
             </li>
         </ul>
-    </div>`
+  `
 })
 export class ThemeSwitcher {
   private readonly STORAGE_KEY = 'themeSwitcherState';

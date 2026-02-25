@@ -1,37 +1,50 @@
-import {Component, OnInit, signal} from '@angular/core';
+import {Component, inject, OnInit} from '@angular/core';
 import {RouterOutlet} from '@angular/router';
 import {Toast} from 'primeng/toast';
-import {Select} from 'primeng/select';
-import {User, UserService} from './service/user-service';
-import {FormsModule} from '@angular/forms';
-import {take, tap} from 'rxjs';
-import {Button} from 'primeng/button';
+import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {ThemeSwitcher} from './themeswitcher';
+import {AccountService} from './service/account.service';
+import {MenuItem} from 'primeng/api';
+import {Menubar} from 'primeng/menubar';
+import {DatePicker} from 'primeng/datepicker';
+import {Sidebar} from './components/sidebar/sidebar';
+import {Button} from 'primeng/button';
+
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Toast, Select, FormsModule, Button, ThemeSwitcher],
+  imports: [RouterOutlet, Toast, FormsModule, ThemeSwitcher, ReactiveFormsModule, Menubar, DatePicker, Sidebar, Button],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  protected readonly title = signal('bills-client');
-  protected readonly users = signal<User[]>([]);
-  protected user_loading = true;
-  protected selectedUser: User | undefined;
+  stats_loading = false;
+  private account_service = inject(AccountService);
+  protected items: MenuItem[];
 
-  constructor(private us: UserService) {
-  }
+  rangeDates: Date[];
+
 
   ngOnInit(): void {
-    this.us.get_users().pipe(
-      take(1),
-      tap((users) => {
-        this.users.set(users);
-        this.user_loading = false;
-      })
-    ).subscribe();
+    // initialize rangeDates: [now, now - 1 years]
+    // const now = new Date();
+    // const fiveYearsAgo = new Date(now);
+    // fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 1);
+    // this.rangeDates = [now, fiveYearsAgo];
+    const now = new Date();
+    // set range to now and two months ago
+    const twoMonthsAgo = new Date(now);
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    this.rangeDates = [now, twoMonthsAgo];
+
+
   }
 
+  protected onRangeChange() {
+    this.account_service.time_range = this.rangeDates;
+  }
 
+  protected fetchStats() {
+
+  }
 }

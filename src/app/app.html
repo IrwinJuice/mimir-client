@@ -1,15 +1,28 @@
-<div>
-  <div>
+<p-menubar class="mb-4" [model]="items">
+  <ng-template #start>
+
+  </ng-template>
+  <ng-template #item let-item let-root="root">
+    <div class="flex items-center gap-2">
+      <p-date-picker [(ngModel)]="rangeDates" (ngModelChange)="onRangeChange()" selectionMode="range"
+                     [readonlyInput]="true"/>
+      @if (stats_loading) {
+        <i class="pi pi-spinner pi-spin"></i>
+      } @else {
+        <p-button label="Fetch stats" (click)="fetchStats()"/>
+      }
+    </div>
+  </ng-template>
+  <ng-template #end>
+    <theme-switcher/>
+  </ng-template>
+</p-menubar>
+<div class="flex p-0 gap-2 w-full">
+  <div class="h-full w-3/4">
     <router-outlet/>
   </div>
-  <div>
-    <theme-switcher />
-    @if (users().length > 0) {
-      <p-select [options]="users()" [(ngModel)]="selectedUser" [loading]="true" optionLabel="name"
-                placeholder="Loading..." class="w-full md:w-56"/>
-    } @else {
-      <p-button label="Add user" icon="pi pi-plus"/>
-    }
+  <div class="h-full w-1/4">
+    <app-sidebar></app-sidebar>
   </div>
 </div>
 <p-toast/>

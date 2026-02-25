@@ -1,0 +1,27 @@
+<div class="flex gap-2">
+  @if (users().length > 0) {
+    <p-select [options]="users()"
+              [(ngModel)]="selectedUser"
+              (ngModelChange)="onUserSelect($event)"
+              [loading]="user_loading"
+              optionLabel="name"
+              placeholder="Loading..."
+              class="w-full md:w-56"/>
+  }
+
+  <p-button label="Додати" icon="pi pi-plus" (click)="visible_user_dialog = true"/>
+
+  <p-dialog header="Додати нового користувача" [modal]="true" [(visible)]="visible_user_dialog"
+            [style]="{ width: '25rem' }">
+    <form [formGroup]="userForm" action="" (submit)="create_user()">
+      <div class="flex items-center gap-4 mb-4">
+        <label for="username" class="font-semibold w-24">Username</label>
+        <input pInputText id="username" formControlName="name" class="flex-auto" autocomplete="off"/>
+      </div>
+      <div class="flex justify-end gap-2">
+        <p-button type="button" label="Cancel" severity="secondary" (click)="visible_user_dialog = false"/>
+        <p-button type="submit" [disabled]="!userForm.valid" label="Save"/>
+      </div>
+    </form>
+  </p-dialog>
+</div>

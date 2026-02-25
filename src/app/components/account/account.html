@@ -1,0 +1,49 @@
+@let accounts = accounts$ | async;
+<div class="flex flex-col gap-4">
+  @if (accounts && accounts.length > 0) {
+    <div class="flex items-center gap-2">
+      @if (loading) {
+        <i class="pi pi-spinner pi-spin"></i>
+      } @else {
+        <p-button icon="pi pi-sync" label="Зібрати статистику" (click)="fetchStats()"/>
+      }
+    </div>
+  }
+
+  <p-button label="Додати" icon="pi pi-plus" (click)="visible_account_dialog = true"/>
+
+  <p-dialog header="Додати банківський аккаунт" [modal]="true" [(visible)]="visible_account_dialog"
+            [style]="{ width: '25rem' }">
+    <form class="flex-col items-center gap-4 mb-4" [formGroup]="accountForm" action="" (submit)="add_account()">
+      <div class="flex items-center gap-4 mb-4">
+        <label for="account_kind" class="font-semibold w-24">Kind</label>
+        <p-select id="account_kind" [options]="account_kinds" formControlName="account_kind"
+                  class="w-full md:w-56"/>
+      </div>
+      <div class="flex items-center gap-4 mb-4">
+        <label for="account_name" class="font-semibold w-24">Token</label>
+        <input pInputText id="account_name" formControlName="account_token" class="flex-auto" autocomplete="off"/>
+      </div>
+      <div class="flex justify-end gap-2">
+        <p-button type="button" label="Cancel" severity="secondary" (click)="visible_account_dialog = false"/>
+        <p-button type="submit" [disabled]="!accountForm.valid" label="Save"/>
+      </div>
+    </form>
+  </p-dialog>
+
+  @if (accounts && accounts.length > 0) {
+    <form [formGroup]="accountsForm" class="flex flex-col gap-4">
+      <div class="flex items-center gap-2">
+        <p-checkbox formControlName="ida_main" [binary]="true" inputId="ida_main"
+                    [indeterminate]="mainIndeterminate()"/>
+        <label for="ida_main">Усі</label>
+      </div>
+      @for (account of accounts; track account) {
+        <div class="flex items-center gap-2">
+          <p-checkbox [formControlName]="'ida_'+ account.ida" [binary]="true" [inputId]="'ida_'+ account.ida"/>
+          <label [for]="'ida_'+ account.ida"> {{ account.kind | titlecase }} </label>
+        </div>
+      }
+    </form>
+  }
+</div>
