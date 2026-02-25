@@ -22,29 +22,20 @@ export class App implements OnInit {
   private account_service = inject(AccountService);
   protected items: MenuItem[];
 
-  rangeDates: Date[];
+  range_dates: Date[];
 
 
   ngOnInit(): void {
-    // initialize rangeDates: [now, now - 1 years]
-    // const now = new Date();
-    // const fiveYearsAgo = new Date(now);
-    // fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 1);
-    // this.rangeDates = [now, fiveYearsAgo];
     const now = new Date();
     // set range to now and two months ago
     const twoMonthsAgo = new Date(now);
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    this.rangeDates = [now, twoMonthsAgo];
-
-
+    this.range_dates = [now, twoMonthsAgo];
+    this.account_service.time_range = this.range_dates;
   }
 
   protected onRangeChange() {
-    this.account_service.time_range = this.rangeDates;
+    this.account_service.time_range = this.range_dates;
   }
 
-  protected fetchStats() {
-
-  }
 }

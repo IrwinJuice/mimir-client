@@ -1,17 +1,7 @@
-<p-menubar class="mb-4" [model]="items">
+<p-menubar class="mb-4">
   <ng-template #start>
-
-  </ng-template>
-  <ng-template #item let-item let-root="root">
-    <div class="flex items-center gap-2">
-      <p-date-picker [(ngModel)]="rangeDates" (ngModelChange)="onRangeChange()" selectionMode="range"
-                     [readonlyInput]="true"/>
-      @if (stats_loading) {
-        <i class="pi pi-spinner pi-spin"></i>
-      } @else {
-        <p-button label="Fetch stats" (click)="fetchStats()"/>
-      }
-    </div>
+    <p-date-picker [(ngModel)]="range_dates" (ngModelChange)="onRangeChange()" selectionMode="range"
+                   [readonlyInput]="true"/>
   </ng-template>
   <ng-template #end>
     <theme-switcher/>
