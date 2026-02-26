@@ -1,14 +1,12 @@
 @let accounts = accounts$ | async;
 <div class="flex flex-col gap-4">
-  @if (accounts && accounts.length > 0) {
-    <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2">
+    <p-button label="Додати" icon="pi pi-plus" (click)="visible_account_dialog = true"/>
+    @if (accounts && accounts.length > 0) {
       <p-button [disabled]="loading" [icon]="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sync'"
                 label="Зібрати статистику" (click)="fetchStats()"/>
-    </div>
-  }
-
-  <p-button label="Додати" icon="pi pi-plus" (click)="visible_account_dialog = true"/>
-
+    }
+  </div>
   <p-dialog header="Додати банківський аккаунт" [modal]="true" [(visible)]="visible_account_dialog"
             [style]="{ width: '25rem' }">
     <form class="flex-col items-center gap-4 mb-4" [formGroup]="accountForm" action="" (submit)="add_account()">
@@ -29,18 +27,36 @@
   </p-dialog>
 
   @if (accounts && accounts.length > 0) {
-    <form [formGroup]="accountsForm" class="flex flex-col gap-4">
-      <div class="flex items-center gap-2">
-        <p-checkbox formControlName="ida_main" [binary]="true" inputId="ida_main"
-                    [indeterminate]="mainIndeterminate()"/>
-        <label for="ida_main">Усі</label>
-      </div>
-      @for (account of accounts; track account) {
-        <div class="flex items-center gap-2">
-          <p-checkbox [formControlName]="'ida_'+ account.ida" [binary]="true" [inputId]="'ida_'+ account.ida"/>
-          <label [for]="'ida_'+ account.ida"> {{ account.kind | titlecase }} </label>
-        </div>
-      }
-    </form>
+
+    <p-tree-table [value]="accountsTree" [columns]="cols" selectionMode="checkbox" [(selectionKeys)]="selectionKeys"
+                  dataKey="key" [scrollable]="true" [tableStyle]="{ 'min-width': '50rem' }">
+      <ng-template #header let-columns>
+        <tr>
+          @for (col of columns; track col) {
+            <th>
+              {{ col.header }}
+            </th>
+          }
+        </tr>
+      </ng-template>
+      <ng-template #body let-rowNode let-rowData="rowData" let-columns="columns">
+        <tr [ttRow]="rowNode" [ttSelectableRow]="rowNode">
+          @for (col of columns; let first = $first; track col) {
+            <td>
+              @if (first) {
+                <div class="flex items-center gap-2">
+                  <p-treetable-toggler [rowNode]="rowNode"/>
+                  <p-treetable-checkbox [value]="rowNode"/>
+                  <span>{{ rowData[col.field] }}</span>
+                </div>
+              } @else {
+                {{ rowData[col.field] }}
+              }
+            </td>
+          }
+        </tr>
+      </ng-template>
+    </p-tree-table>
+
   }
 </div>

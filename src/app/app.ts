@@ -8,12 +8,11 @@ import {MenuItem} from 'primeng/api';
 import {Menubar} from 'primeng/menubar';
 import {DatePicker} from 'primeng/datepicker';
 import {Sidebar} from './components/sidebar/sidebar';
-import {Button} from 'primeng/button';
 
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Toast, FormsModule, ThemeSwitcher, ReactiveFormsModule, Menubar, DatePicker, Sidebar, Button],
+  imports: [RouterOutlet, Toast, FormsModule, ThemeSwitcher, ReactiveFormsModule, Menubar, DatePicker, Sidebar],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

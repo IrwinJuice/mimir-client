@@ -8,7 +8,7 @@
   @let selectedUser$ = userService.selected_user$ | async;
   @if (selectedUser$) {
     <p-divider align="left" type="solid">
-      <b>Банківські аккаунти</b>
+      <b>Банківські аккаунти (Локальні дані)</b>
     </p-divider>
     <app-account [user]="selectedUser$"></app-account>
   }

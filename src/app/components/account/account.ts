@@ -1,29 +1,40 @@
 import {Component, DestroyRef, inject, Input, OnInit, signal} from '@angular/core';
 import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Button} from 'primeng/button';
-import {Checkbox} from 'primeng/checkbox';
 import {Dialog} from 'primeng/dialog';
 import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
-import {AsyncPipe, TitleCasePipe} from '@angular/common';
-import {Account as AccountModel, AccountKind, AccountService, CreateAccount} from '../../service/account.service';
-import {finalize, take, tap} from 'rxjs';
+import {AsyncPipe} from '@angular/common';
+import {
+  Account as ServiceAccount,
+  AccountKind,
+  AccountMonitor,
+  AccountService,
+  CreateAccount
+} from '../../service/account.service';
+import {finalize, Observable, switchMap, take, tap} from 'rxjs';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {MessageService} from 'primeng/api';
+import {MessageService, TreeNode} from 'primeng/api';
 import {User} from '../../service/user.service';
+import {TreeTableModule} from 'primeng/treetable';
+import {DateTime} from 'luxon';
+
+interface Column {
+  field: string;
+  header: string;
+}
 
 @Component({
   selector: 'app-account',
   imports: [
     ReactiveFormsModule,
     Button,
-    Checkbox,
     Dialog,
     InputText,
     Select,
-    TitleCasePipe,
     AsyncPipe,
-    FormsModule
+    FormsModule,
+    TreeTableModule
   ],
   templateUrl: './account.html',
   styleUrl: './account.scss',
@@ -51,25 +62,76 @@ export class Account implements OnInit {
     ida_main: this.formBuilder.nonNullable.control(false)
   } as { [key: string]: any });
 
-  protected accounts$ = this.account_service.accounts$.pipe(
-    tap((accounts: AccountModel[]) => {
-      accounts.forEach((account: AccountModel) => {
-        const controlName = 'ida_' + account.ida;
-        if (!this.accountsForm.contains(controlName)) {
-          this.accountsForm.addControl(controlName, this.formBuilder.nonNullable.control(false));
-        }
-      });
-    })
-  );
+  protected accounts$: Observable<ServiceAccount[]> = this.account_service.accounts$;
+  // .pipe(
+  //   tap((accounts: AccountModel[]) => {
+  //     console.log('accounts', accounts);
+  //     accounts.forEach((account: AccountModel) => {
+  //       const controlName = 'ida_' + account.ida;
+  //       if (!this.accountsForm.contains(controlName)) {
+  //         this.accountsForm.addControl(controlName, this.formBuilder.nonNullable.control(false));
+  //       }
+  //     });
+  //   })
+  // );
 
   protected mainIndeterminate = signal(false);
 
+  protected monitors: AccountMonitor[] = [];
+
+  accountsTree: TreeNode[] = [];
+  selectionKeys: any = {};
+  cols!: Column[];
+
   ngOnInit(): void {
+
+    this.cols = [
+      {field: 'kind', header: 'Аккаунт'},
+      {field: 'iban', header: 'IBAN'},
+      {field: 'balance', header: 'Баланс'},
+      {field: 'last_taken_date', header: 'З'},
+      {field: 'updated_at', header: 'По'},
+    ];
+
 
     this.account_service.get_accounts_by_idu(this.user.idu).pipe(
       take(1),
-      tap((accounts) => {
+      switchMap((accounts) => {
         this.account_service.accounts = accounts;
+        accounts.forEach((a) => {
+          this.accountsTree.push({
+            key: `account-${a.ida}`,
+            data: {kind: a.kind},
+            children: []
+          });
+          this.selectionKeys[`account-${a.ida}`] = {
+            checked: true
+          }
+        });
+        return this.account_service.get_account_monitors(this.user.idu);
+      }),
+      tap((monitors) => {
+        this.monitors = monitors || [];
+
+        this.monitors.forEach((m) => {
+          const parent = this.accountsTree.find(n => n.key === `account-${m.ida}`);
+          if (parent) {
+            parent.children!.push({
+              key: `monitor-${m.ida}-${m.external_id}`,
+              data: {
+                kind: m.masked_pan,
+                // iban: m.iban,
+                balance: m.balance,
+                updated_at: DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
+                last_taken_date:  DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
+              },
+              leaf: true
+            });
+          }
+        });
+
+        console.log('accountsTree', this.accountsTree);
+
       })
     ).subscribe();
 
@@ -140,7 +202,7 @@ export class Account implements OnInit {
     const from = Math.floor(fromDate.getTime() / 1000);
 
     // from should be < to
-    this.account_service.get_accounts_stats(this.user.idu, from, to).pipe(
+    this.account_service.update_accounts_stat(this.user.idu, from, to).pipe(
       take(1),
       tap((result) => {
         if (result) {
