@@ -122,6 +122,7 @@ export class Account implements OnInit {
               },
               leaf: true
             });
+            parent.expanded = true;
           }
           this.selectionKeys[`monitor-${m.ida}-${m.external_id}`] = {
             checked: true
@@ -228,7 +229,7 @@ export class Account implements OnInit {
 
             // update selection keys for the monitors of this account
             children.forEach(ch => this.selectionKeys[ch.key] = {checked: true});
-
+            acc.expanded = true;
             return {...acc, children} as TreeNode;
           });
 

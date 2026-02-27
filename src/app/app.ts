@@ -37,21 +37,36 @@ export class App implements OnInit {
 
     this.web_socket_service.connect().subscribe({
       next: (msg) => {
-        let notification = msg.data as WebSocketNotification;
+        let notification = JSON.parse(msg.data) as WebSocketNotification;
         console.log('Received:', notification)
+        console.log('event:', notification.event)
+        console.log('event:', notification.event === WebSocketNotificationKind.MONITOR_PENDING)
+
 
         switch (notification.event) {
           case WebSocketNotificationKind.ALL_MONITORS_UPDATED:
-            this.message.add({severity: 'success', summary: 'Оновлено', detail: 'Статистику по всім банківським аккаунтам оновлено успішно.'});
+            this.message.add({
+              severity: 'success',
+              summary: 'Оновлено',
+              detail: 'Статистику по всім банківським аккаунтам оновлено успішно.'
+            });
             break;
           case WebSocketNotificationKind.MONITOR_PENDING:
             this.account_service.monitor_status = notification;
-            this.message.add({severity: 'info', summary: 'Оновлюється', detail: `Рахунок ${notification.masked_pan} оновлюється.`});
+            this.message.add({
+              severity: 'info',
+              summary: 'Оновлюється',
+              detail: `Рахунок ${notification.masked_pan} оновлюється.`
+            });
             break;
           case WebSocketNotificationKind.MONITOR_UPDATED:
 
             this.account_service.monitor_status = notification;
-            this.message.add({severity: 'success', summary: 'Оновлено', detail: `Статистику по рахунку ${notification.masked_pan} оновлено успішно.`});
+            this.message.add({
+              severity: 'success',
+              summary: 'Оновлено',
+              detail: `Статистику по рахунку ${notification.masked_pan} оновлено успішно.`
+            });
             break;
         }
       },
