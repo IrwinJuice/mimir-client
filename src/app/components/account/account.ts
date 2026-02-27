@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, DestroyRef, inject, Input, OnInit, signal} from '@angular/core';
+import {ChangeDetectorRef, Component, DestroyRef, inject, Input, OnInit} from '@angular/core';
 import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Button} from 'primeng/button';
 import {Dialog} from 'primeng/dialog';
@@ -9,16 +9,19 @@ import {
   Account as BankAccount,
   AccountKind,
   AccountMonitor,
+  AccountMonitorStatus,
   AccountService,
   CreateAccount
 } from '../../service/account.service';
 import {finalize, Observable, switchMap, take, tap} from 'rxjs';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {MessageService, TreeNode} from 'primeng/api';
 import {User} from '../../service/user.service';
 import {TreeTableModule} from 'primeng/treetable';
 import {DateTime} from 'luxon';
 import * as cc from 'currency-codes';
+import {ProgressBar} from 'primeng/progressbar';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {WebSocketNotificationKind} from '../../service/web-socket-service';
 
 interface Column {
   field: string;
@@ -36,7 +39,8 @@ interface Column {
     Select,
     AsyncPipe,
     FormsModule,
-    TreeTableModule
+    TreeTableModule,
+    ProgressBar
   ],
   templateUrl: './account.html',
   styleUrl: './account.scss',
@@ -61,25 +65,8 @@ export class Account implements OnInit {
     account_token: ['', Validators.required],
   });
 
-  protected accountsForm = this.formBuilder.nonNullable.group({
-    ida_main: this.formBuilder.nonNullable.control(false)
-  } as { [key: string]: any });
 
   protected accounts$: Observable<BankAccount[]> = this.account_service.accounts$;
-  // .pipe(
-  //   tap((accounts: AccountModel[]) => {
-  //     console.log('accounts', accounts);
-  //     accounts.forEach((account: AccountModel) => {
-  //       const controlName = 'ida_' + account.ida;
-  //       if (!this.accountsForm.contains(controlName)) {
-  //         this.accountsForm.addControl(controlName, this.formBuilder.nonNullable.control(false));
-  //       }
-  //     });
-  //   })
-  // );
-
-  protected mainIndeterminate = signal(false);
-
   protected monitors: AccountMonitor[] = [];
 
   accountsTree: TreeNode[] = [];
@@ -102,9 +89,10 @@ export class Account implements OnInit {
       switchMap((accounts) => {
         this.account_service.accounts = accounts;
         accounts.forEach((a) => {
+          // include ida in the node data so later lookups (by data.ida) work
           this.accountsTree.push({
             key: `account-${a.ida}`,
-            data: {kind: a.kind},
+            data: {kind: a.kind, ida: a.ida},
             children: []
           });
           this.selectionKeys[`account-${a.ida}`] = {
@@ -115,6 +103,7 @@ export class Account implements OnInit {
       }),
       tap((monitors) => {
         this.monitors = monitors || [];
+        console.log(monitors)
 
         this.monitors.forEach((m) => {
           const parent = this.accountsTree.find(n => n.key === `account-${m.ida}`);
@@ -122,11 +111,14 @@ export class Account implements OnInit {
             parent.children!.push({
               key: `monitor-${m.ida}-${m.external_id}`,
               data: {
+                // include ida and external_id for reliable future lookups
+                ida: m.ida,
+                external_id: m.external_id,
                 kind: m.masked_pan,
-                // iban: m.iban,
+                loading: m.status === AccountMonitorStatus.PENDING,
                 balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                updated_at: DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
-                last_taken_date: DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
+                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
               },
               leaf: true
             });
@@ -141,32 +133,21 @@ export class Account implements OnInit {
       })
     ).subscribe();
 
-    // When ida_main toggles — set all children (no event to avoid loop)
-    this.accountsForm.get('ida_main')!.valueChanges.pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((checked: boolean) => {
-      this.mainIndeterminate.set(false);
-      Object.keys(this.accountsForm.controls).forEach(key => {
-        if (key !== 'ida_main') {
-          this.accountsForm.get(key)!.setValue(checked, {emitEvent: false});
-        }
-      });
-    });
-
-    // When any child changes — update ida_main and indeterminate state
-    this.accountsForm.valueChanges.pipe(
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((values: { [key: string]: boolean }) => {
-      const childKeys = Object.keys(values).filter(k => k !== 'ida_main');
-      if (childKeys.length === 0) return;
-
-      const checkedCount = childKeys.filter(k => values[k]).length;
-      const allChecked = checkedCount === childKeys.length;
-      const noneChecked = checkedCount === 0;
-
-      this.mainIndeterminate.set(!allChecked && !noneChecked);
-      this.accountsForm.get('ida_main')!.setValue(allChecked, {emitEvent: false});
-    });
+    this.account_service.monitor_status$
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        tap((notification) => {
+          // now account.data.ida exists so this lookup will work
+          let account = this.accountsTree.find((node) => node.data.ida === notification.ida);
+          if (account) {
+            let monitor = account.children.find((node) => node.data.external_id === notification.external_id);
+            monitor.data.loading = notification.event === WebSocketNotificationKind.MONITOR_PENDING;
+            this.accountsTree = [...this.accountsTree];
+            this.cdr.detectChanges();
+          }
+        })
+      )
+      .subscribe();
   }
 
   add_account() {
@@ -181,6 +162,15 @@ export class Account implements OnInit {
         take(1),
         tap((account) => {
           this.account_service.accounts = [...this.account_service.accounts, account]
+          // include ida in node data
+          this.accountsTree.push({
+            key: `account-${account.ida}`,
+            data: {kind: account.kind, ida: account.ida},
+            children: []
+          });
+          this.selectionKeys[`account-${account.ida}`] = {
+            checked: true
+          }
           this.message.add({severity: 'info', summary: 'Account', detail: 'Успішно додано.'});
           this.visible_account_dialog = false;
         })
@@ -189,7 +179,7 @@ export class Account implements OnInit {
   }
 
   // Use date-picker rangeDates to call stats endpoint
-  fetchStats() {
+  fetch_stats() {
     this.loading = true;
     let time_range = this.account_service.time_range;
     if (!time_range || time_range.length < 2) {
@@ -201,7 +191,6 @@ export class Account implements OnInit {
     // rangeDates is [start, end] — convert to ISO strings (strip timezone if needed)
     const toDate: Date = time_range[0];
     const fromDate: Date = time_range[1];
-    console.log(`to ${toDate}, from ${fromDate}`)
 
     // Convert to Unix timestamps (seconds since epoch)
     const to = Math.floor(toDate.getTime() / 1000);
@@ -212,14 +201,46 @@ export class Account implements OnInit {
       take(1),
       tap((result) => {
         if (result) {
-          this.message.add({severity: 'info', summary: 'Stats', detail: 'Stats fetched successfully.'});
           console.log('accounts stats:', result);
+          this.monitors = result;
+
+          // Build a new accountsTree immutably so change detection picks up child changes
+          const newTree = this.accountsTree.map(acc => {
+            // prefer acc.data.ida but fall back to parsing from key if needed
+            const accId = acc?.data?.ida ?? (() => {
+              const parts = (acc.key || '').split('-');
+              return parts.length > 1 ? Number(parts[1]) : undefined;
+            })();
+
+            const children = (result as AccountMonitor[]).filter(m => m.ida === accId).map(m => ({
+              key: `monitor-${m.ida}-${m.external_id}`,
+              data: {
+                ida: m.ida,
+                external_id: m.external_id,
+                kind: m.masked_pan,
+                loading: m.status === AccountMonitorStatus.PENDING,
+                balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
+                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+              },
+              leaf: true
+            }));
+
+            // update selection keys for the monitors of this account
+            children.forEach(ch => this.selectionKeys[ch.key] = {checked: true});
+
+            return {...acc, children} as TreeNode;
+          });
+
+          this.accountsTree = newTree;
+
         } else {
           this.message.add({severity: 'warn', summary: 'Stats', detail: 'No data returned.'});
         }
       }),
       finalize(() => {
         this.loading = false;
+        this.cdr.detectChanges();
       })
     ).subscribe();
   }

@@ -4,7 +4,7 @@
     <p-button label="Додати" icon="pi pi-plus" (click)="visible_account_dialog = true"/>
     @if (accounts && accounts.length > 0) {
       <p-button [disabled]="loading" [icon]="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sync'"
-                label="Зібрати статистику" (click)="fetchStats()"/>
+                label="Зібрати статистику" (click)="fetch_stats()"/>
     }
   </div>
   <p-dialog header="Додати банківський аккаунт" [modal]="true" [(visible)]="visible_account_dialog"
@@ -47,6 +47,9 @@
                 <div class="flex items-center gap-2">
                   <p-treetable-toggler [rowNode]="rowNode"/>
                   <p-treetable-checkbox [value]="rowNode"/>
+                  @if (rowData['loading']) {
+                    <p-progress-bar mode="indeterminate" [style]="{ width: '40px', height: '6px' }" />
+                  }
                   <span>{{ rowData[col.field] }}</span>
                 </div>
               } @else {

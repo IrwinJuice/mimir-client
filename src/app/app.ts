@@ -4,10 +4,11 @@ import {Toast} from 'primeng/toast';
 import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {ThemeSwitcher} from './themeswitcher';
 import {AccountService} from './service/account.service';
-import {MenuItem} from 'primeng/api';
+import {MenuItem, MessageService} from 'primeng/api';
 import {Menubar} from 'primeng/menubar';
 import {DatePicker} from 'primeng/datepicker';
 import {Sidebar} from './components/sidebar/sidebar';
+import {WebSocketNotification, WebSocketNotificationKind, WebSocketService} from './service/web-socket-service';
 
 
 @Component({
@@ -19,6 +20,8 @@ import {Sidebar} from './components/sidebar/sidebar';
 export class App implements OnInit {
   stats_loading = false;
   private account_service = inject(AccountService);
+  private message = inject(MessageService);
+  private web_socket_service = inject(WebSocketService);
   protected items: MenuItem[];
 
   range_dates: Date[];
@@ -31,6 +34,30 @@ export class App implements OnInit {
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
     this.range_dates = [now, twoMonthsAgo];
     this.account_service.time_range = this.range_dates;
+
+    this.web_socket_service.connect().subscribe({
+      next: (msg) => {
+        let notification = msg.data as WebSocketNotification;
+        console.log('Received:', notification)
+
+        switch (notification.event) {
+          case WebSocketNotificationKind.ALL_MONITORS_UPDATED:
+            this.message.add({severity: 'success', summary: 'Оновлено', detail: 'Статистику по всім банківським аккаунтам оновлено успішно.'});
+            break;
+          case WebSocketNotificationKind.MONITOR_PENDING:
+            this.account_service.monitor_status = notification;
+            this.message.add({severity: 'info', summary: 'Оновлюється', detail: `Рахунок ${notification.masked_pan} оновлюється.`});
+            break;
+          case WebSocketNotificationKind.MONITOR_UPDATED:
+
+            this.account_service.monitor_status = notification;
+            this.message.add({severity: 'success', summary: 'Оновлено', detail: `Статистику по рахунку ${notification.masked_pan} оновлено успішно.`});
+            break;
+        }
+      },
+      error: (err) => console.error('WebSocket error:', err),
+      complete: () => console.log('Connection closed')
+    })
   }
 
   protected onRangeChange() {

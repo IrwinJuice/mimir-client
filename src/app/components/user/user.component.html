@@ -1,8 +1,8 @@
 <div class="flex gap-2">
   @if (users().length > 0) {
     <p-select [options]="users()"
-              [(ngModel)]="selectedUser"
-              (ngModelChange)="onUserSelect($event)"
+              [(ngModel)]="selected_user"
+              (ngModelChange)="on_user_select($event)"
               [loading]="user_loading"
               optionLabel="name"
               placeholder="Loading..."

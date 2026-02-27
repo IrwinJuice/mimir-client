@@ -29,7 +29,7 @@ export class UserComponent implements OnInit {
 
   protected readonly users = signal<User[]>([]);
 
-  protected selectedUser: User | undefined;
+  protected selected_user: User | undefined;
   protected user_loading = true;
   protected visible_user_dialog = false;
   protected userForm = this.formBuilder.nonNullable.group({
@@ -43,8 +43,8 @@ export class UserComponent implements OnInit {
       tap((users) => {
         this.users.set(users);
         if (users.length > 0) {
-          this.selectedUser = users[0];
-          this.onUserSelect(users[0]);
+          this.selected_user = users[0];
+          this.on_user_select(users[0]);
         }
         this.user_loading = false;
       })
@@ -59,7 +59,8 @@ export class UserComponent implements OnInit {
         take(1),
         tap((user) => {
           this.users.update(list => [...list, user]);
-          this.onUserSelect(user);
+          this.on_user_select(user);
+          this.selected_user = user;
           this.visible_user_dialog = false;
           this.message.add({severity: 'info', summary: 'User', detail: 'Успішно додано.'});
         })
@@ -68,7 +69,7 @@ export class UserComponent implements OnInit {
   }
 
 
-  onUserSelect(user: User) {
+  on_user_select(user: User) {
     this.userService.selected_user = user;
   }
 }

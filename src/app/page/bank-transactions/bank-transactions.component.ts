@@ -1,16 +1,22 @@
 import {Component, inject, OnInit, PLATFORM_ID} from '@angular/core';
 import {isPlatformBrowser} from '@angular/common';
 import { ChartModule } from 'primeng/chart';
+import {Checkbox} from 'primeng/checkbox';
+import {FormsModule} from '@angular/forms';
 
 @Component({
-  selector: 'app-bills',
+  selector: 'app-bank-transaction',
   imports: [
-    ChartModule
+    ChartModule,
+    Checkbox,
+    FormsModule
   ],
-  templateUrl: './bills.html',
-  styleUrl: './bills.scss',
+  templateUrl: './bank-transactions.component.html',
+  styleUrl: './bank-transactions.component.scss',
 })
-export class Bills implements OnInit {
+export class BankTransactionsComponent implements OnInit {
+  pizza: string[] = [];
+
   data: any;
   options: any;
   platformId = inject(PLATFORM_ID);
