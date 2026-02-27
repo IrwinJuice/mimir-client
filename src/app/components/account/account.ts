@@ -1,4 +1,4 @@
-import {Component, DestroyRef, inject, Input, OnInit, signal} from '@angular/core';
+import {ChangeDetectorRef, Component, DestroyRef, inject, Input, OnInit, signal} from '@angular/core';
 import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Button} from 'primeng/button';
 import {Dialog} from 'primeng/dialog';
@@ -6,7 +6,7 @@ import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
 import {AsyncPipe} from '@angular/common';
 import {
-  Account as ServiceAccount,
+  Account as BankAccount,
   AccountKind,
   AccountMonitor,
   AccountService,
@@ -18,10 +18,12 @@ import {MessageService, TreeNode} from 'primeng/api';
 import {User} from '../../service/user.service';
 import {TreeTableModule} from 'primeng/treetable';
 import {DateTime} from 'luxon';
+import * as cc from 'currency-codes';
 
 interface Column {
   field: string;
   header: string;
+  width: string;
 }
 
 @Component({
@@ -50,6 +52,7 @@ export class Account implements OnInit {
   private account_service = inject(AccountService);
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);
+  private cdr = inject(ChangeDetectorRef);
 
   protected readonly account_kinds: AccountKind[] = [AccountKind.MONO];
   protected visible_account_dialog = false;
@@ -62,7 +65,7 @@ export class Account implements OnInit {
     ida_main: this.formBuilder.nonNullable.control(false)
   } as { [key: string]: any });
 
-  protected accounts$: Observable<ServiceAccount[]> = this.account_service.accounts$;
+  protected accounts$: Observable<BankAccount[]> = this.account_service.accounts$;
   // .pipe(
   //   tap((accounts: AccountModel[]) => {
   //     console.log('accounts', accounts);
@@ -86,11 +89,11 @@ export class Account implements OnInit {
   ngOnInit(): void {
 
     this.cols = [
-      {field: 'kind', header: 'Аккаунт'},
-      {field: 'iban', header: 'IBAN'},
-      {field: 'balance', header: 'Баланс'},
-      {field: 'last_taken_date', header: 'З'},
-      {field: 'updated_at', header: 'По'},
+      {field: 'kind', header: 'Аккаунт', width: '200px'},
+      // {field: 'iban', header: 'IBAN'},
+      {field: 'balance', header: 'Баланс', width: '100px'},
+      {field: 'last_taken_date', header: 'З', width: '100px'},
+      {field: 'updated_at', header: 'По', width: '100px'},
     ];
 
 
@@ -121,17 +124,20 @@ export class Account implements OnInit {
               data: {
                 kind: m.masked_pan,
                 // iban: m.iban,
-                balance: m.balance,
+                balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
                 updated_at: DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
-                last_taken_date:  DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
+                last_taken_date: DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS),
               },
               leaf: true
             });
           }
+          this.selectionKeys[`monitor-${m.ida}-${m.external_id}`] = {
+            checked: true
+          }
         });
 
-        console.log('accountsTree', this.accountsTree);
-
+        this.accountsTree = [...this.accountsTree];
+        this.cdr.detectChanges();
       })
     ).subscribe();
 
