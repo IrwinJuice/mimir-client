@@ -13,7 +13,7 @@ import {
   AccountService,
   CreateAccount
 } from '../../service/account.service';
-import {finalize, Observable, switchMap, take, tap} from 'rxjs';
+import {finalize, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
 import {MessageService, TreeNode} from 'primeng/api';
 import {User} from '../../service/user.service';
 import {TreeTableModule} from 'primeng/treetable';
@@ -21,7 +21,6 @@ import {DateTime} from 'luxon';
 import * as cc from 'currency-codes';
 import {ProgressBar} from 'primeng/progressbar';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {WebSocketNotificationKind} from '../../service/web-socket-service';
 
 interface Column {
   field: string;
@@ -137,16 +136,31 @@ export class Account implements OnInit {
     this.account_service.monitor_status$
       .pipe(
         takeUntilDestroyed(this.destroyRef),
-        tap((notification) => {
-          // now account.data.ida exists so this lookup will work
+        mergeMap((notification) => {
           let account = this.accountsTree.find((node) => node.data.ida === notification.ida);
           if (account) {
             let monitor = account.children.find((node) => node.data.external_id === notification.external_id);
-            monitor.data.loading = notification.event === WebSocketNotificationKind.MONITOR_PENDING;
-            this.accountsTree = [...this.accountsTree];
-            this.cdr.detectChanges();
+            return this.account_service.get_account_monitor(this.user.idu, monitor.data.external_id).pipe(
+              tap((m) => {
+                console.log('m', m)
+                monitor.data = {
+                    // include ida and external_id for reliable future lookups
+                    ida: m.ida,
+                    external_id: m.external_id,
+                    kind: m.masked_pan,
+                    loading: m.status === AccountMonitorStatus.PENDING,
+                    balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
+                    updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                    last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                };
+                this.accountsTree = [...this.accountsTree];
+                this.cdr.detectChanges();
+              })
+            );
+          } else {
+            return NEVER;
           }
-        })
+        }),
       )
       .subscribe();
   }

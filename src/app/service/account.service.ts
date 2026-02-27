@@ -125,5 +125,15 @@ export class AccountService {
     );
   }
 
+  // Fetch account monitor by external_id
+  get_account_monitor(idu: number, external_id: string): Observable<AccountMonitor> {
+    const url = `${environment.apiBase}/users/${idu}/monitors/${external_id}`;
+    return this.http.get<AccountMonitor>(url).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
+        return of(null);
+      })
+    );
+  }
 
 }
