@@ -1,5 +1,4 @@
-import {Component, DestroyRef, inject, OnInit, PLATFORM_ID} from '@angular/core';
-import {isPlatformBrowser} from '@angular/common';
+import {Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
 import {ChartModule} from 'primeng/chart';
 import {Checkbox} from 'primeng/checkbox';
 import {FormsModule} from '@angular/forms';
@@ -10,11 +9,11 @@ import {BankTransaction, TransactionService} from '../../service/transaction.ser
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
-import {DateTime} from 'luxon';
 import {AgCharts} from 'ag-charts-angular';
-import { getData } from "./data";
+import {DateTime} from 'luxon';
+import {ThemeService} from '../../service/theme.service';
+
 // Chart Options Type Interface
-import { AgChartOptions } from 'ag-charts-community';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -44,9 +43,22 @@ export class BankTransactionsComponent implements OnInit {
 
   user: User;
 
+  theme_service = inject(ThemeService);
+  themeState = this.theme_service.themeState;
 
   constructor() {
-    this.initChart();
+    this.setup_chart([]);
+
+    effect(() => {
+      const state = this.themeState();
+      const options = {...this.options};
+      if (state.darkTheme) {
+        options.theme = "ag-default-dark";
+      } else {
+        options.theme = "ag-default";
+      }
+      this.options = options;
+    });
   }
 
   ngOnInit() {
@@ -77,83 +89,91 @@ export class BankTransactionsComponent implements OnInit {
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        console.log(this.transactions)
-        // Build chart from transactions
-        this.buildChartByDate();
+        console.log(this.transactions);
+        this.setup_chart(this.buildChartByDate());
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
   }
 
-  initChart() {
-    this.options = {
-      zoom: {
-        enabled: true,
-      },
+  setup_chart(data: { time: Date, external_id: string, [key: string]: Date | string | number }[]) {
+    const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
+    console.log(groups)
+
+    const series = groups.map(([external_id, items]) => ({
+      type: "bar",
+      width: 10,
+      xKey: "time",
+      yKey: "amount_" + external_id,
+      yName: external_id,
+      stacked: true,
+      normalizedTo: 100,
       tooltip: {
-        enabled: false,
+        renderer: ({datum}: { datum: any }) => ({
+          title: external_id,
+          content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
+        }),
       },
-      axes: {
-        x: {
-          type: "number",
-          nice: false,
-          interval: {
-            minSpacing: 80,
-            maxSpacing: 120,
-          },
-          label: {
-            autoRotate: false,
-          },
-        },
+    }));
+
+
+    let options = {
+      theme: "ag-default",
+      background: {
+        visible: false
       },
-      data: getData(),
-      series: [
+      zoom: {enabled: true, minVisibleItems: 1},
+      navigator: {enabled: true, miniChart: {enabled: true}},
+      tooltip: {enabled: true},
+      axes: [
         {
-          type: "line",
-          xKey: "year",
-          yKey: "spending",
+          type: "time",
+          position: "bottom",
+          label: {format: "%d.%m %H:%M", autoRotate: true},
+        },
+        {
+          type: "number",
+          position: "left",
+          label: {
+            formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
+          },
         },
       ],
+      data,
+      series,
     };
+
+    const state = this.themeState();
+    if (state.darkTheme) {
+      options.theme = "ag-default-dark";
+    }
+    this.options = options;
   }
 
-  // Build chart aggregates by day (chart shows sum of amounts per day)
-
-  private buildChartByDate() {
+  // Build chart data: x = transaction_time (Date), y = amount (kopecks as-is)
+  private buildChartByDate(): { time: Date, external_id: string, [key: string]: Date | string | number }[] {
     if (!this.transactions || this.transactions.length === 0) {
-      this.data = {labels: [], datasets: []};
-      return;
+      return [];
     }
 
-    const labels = this.transactions.map(t => {
-      return DateTime.fromISO(t.transaction_time, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS)
-    })
-
-    const data = this.transactions.map(t => {
-      return t.amount;
-    });
-
-    this.data = {
-      labels,
-      datasets: [
-        {
-          label: 'Amount',
-          backgroundColor: '#06b6d4',
-          borderColor: '#06b6d4',
-          data
-        }
-      ]
-    };
+    return [...this.transactions]
+      .sort((a, b) => a.transaction_time.localeCompare(b.transaction_time))
+      .map(t => {
+        let amount_key = 'amount_' + t.external_id;
+        return {
+          time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
+          external_id: t.external_id,
+          [amount_key]: t.amount
+        };
+      });
   }
 
   protected onSelect($event: any) {
-    // $event is the ngModel (array) for mss_selected, just rebuild chart with new filter
-    // make sure values are Mcc[]
     if (Array.isArray($event)) {
       this.mss_selected = $event;
     }
-    this.buildChartByDate();
+    this.setup_chart(this.buildChartByDate());
   }
 
   trackByMcc(index: number, item: Mcc) {
