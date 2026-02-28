@@ -1,5 +1,5 @@
 import {Component, DestroyRef, inject, OnInit, PLATFORM_ID} from '@angular/core';
-import {AsyncPipe, isPlatformBrowser} from '@angular/common';
+import {isPlatformBrowser} from '@angular/common';
 import {ChartModule} from 'primeng/chart';
 import {Checkbox} from 'primeng/checkbox';
 import {FormsModule} from '@angular/forms';
@@ -10,6 +10,11 @@ import {BankTransaction, TransactionService} from '../../service/transaction.ser
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
+import {DateTime} from 'luxon';
+import {AgCharts} from 'ag-charts-angular';
+import { getData } from "./data";
+// Chart Options Type Interface
+import { AgChartOptions } from 'ag-charts-community';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -17,7 +22,7 @@ import {MessageService} from 'primeng/api';
     ChartModule,
     Checkbox,
     FormsModule,
-    AsyncPipe
+    AgCharts,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -34,14 +39,17 @@ export class BankTransactionsComponent implements OnInit {
   transactions: BankTransaction[] = [];
   mss_selected: Mcc[] = [];
 
-  data: any;
+  data: any = {labels: [], datasets: []};
   options: any;
-  platformId = inject(PLATFORM_ID);
 
   user: User;
 
-  ngOnInit() {
+
+  constructor() {
     this.initChart();
+  }
+
+  ngOnInit() {
 
     this.user_service.selected_user$.pipe(
       skip(1),
@@ -50,12 +58,12 @@ export class BankTransactionsComponent implements OnInit {
         return this.mcc_service.fetch_mcc_by_idu(user.idu);
       }),
       switchMap((mcc_list) => {
-        this.mcc_list = mcc_list;
+        this.mcc_list = mcc_list || [];
 
         let time_range = this.dt_service.time_range;
         if (!time_range || time_range.length < 2) {
           this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
-          return of([]);
+          return of([] as BankTransaction[]);
         }
 
         // rangeDates is [start, end] — convert to ISO strings
@@ -68,8 +76,10 @@ export class BankTransactionsComponent implements OnInit {
         return this.transaction_service.get_transactions(this.user.idu, [], [], [], from, to)
       }),
       tap((t_list) => {
-        this.transactions = t_list;
-        console.log('transactions', t_list)
+        this.transactions = t_list || [];
+        console.log(this.transactions)
+        // Build chart from transactions
+        this.buildChartByDate();
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -77,69 +87,77 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   initChart() {
-    if (isPlatformBrowser(this.platformId)) {
-      const documentStyle = getComputedStyle(document.documentElement);
-      const textColor = documentStyle.getPropertyValue('--p-text-color');
-      const textColorSecondary = documentStyle.getPropertyValue('--p-text-muted-color');
-      const surfaceBorder = documentStyle.getPropertyValue('--p-content-border-color');
-
-      this.data = {
-        labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
-        datasets: [
-          {
-            label: 'My First dataset',
-            backgroundColor: documentStyle.getPropertyValue('--p-cyan-500'),
-            borderColor: documentStyle.getPropertyValue('--p-cyan-500'),
-            data: [65, 59, 80, 81, 56, 55, 40]
+    this.options = {
+      zoom: {
+        enabled: true,
+      },
+      tooltip: {
+        enabled: false,
+      },
+      axes: {
+        x: {
+          type: "number",
+          nice: false,
+          interval: {
+            minSpacing: 80,
+            maxSpacing: 120,
           },
-          {
-            label: 'My Second dataset',
-            backgroundColor: documentStyle.getPropertyValue('--p-gray-500'),
-            borderColor: documentStyle.getPropertyValue('--p-gray-500'),
-            data: [28, 48, 40, 19, 86, 27, 90]
-          }
-        ]
-      };
-
-      this.options = {
-        maintainAspectRatio: false,
-        aspectRatio: 0.8,
-        plugins: {
-          legend: {
-            labels: {
-              color: textColor
-            }
-          }
+          label: {
+            autoRotate: false,
+          },
         },
-        scales: {
-          x: {
-            ticks: {
-              color: textColorSecondary,
-              font: {
-                weight: 500
-              }
-            },
-            grid: {
-              color: surfaceBorder,
-              drawBorder: false
-            }
-          },
-          y: {
-            ticks: {
-              color: textColorSecondary
-            },
-            grid: {
-              color: surfaceBorder,
-              drawBorder: false
-            }
-          }
-        }
-      };
-      // this.cd.markForCheck();
+      },
+      data: getData(),
+      series: [
+        {
+          type: "line",
+          xKey: "year",
+          yKey: "spending",
+        },
+      ],
+    };
+  }
+
+  // Build chart aggregates by day (chart shows sum of amounts per day)
+
+  private buildChartByDate() {
+    if (!this.transactions || this.transactions.length === 0) {
+      this.data = {labels: [], datasets: []};
+      return;
     }
+
+    const labels = this.transactions.map(t => {
+      return DateTime.fromISO(t.transaction_time, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS)
+    })
+
+    const data = this.transactions.map(t => {
+      return t.amount;
+    });
+
+    this.data = {
+      labels,
+      datasets: [
+        {
+          label: 'Amount',
+          backgroundColor: '#06b6d4',
+          borderColor: '#06b6d4',
+          data
+        }
+      ]
+    };
   }
 
   protected onSelect($event: any) {
-    console.log("event", $event)
+    // $event is the ngModel (array) for mss_selected, just rebuild chart with new filter
+    // make sure values are Mcc[]
+    if (Array.isArray($event)) {
+      this.mss_selected = $event;
+    }
+    this.buildChartByDate();
   }
+
+  trackByMcc(index: number, item: Mcc) {
+    return item.mcc;
+  }
+
 }

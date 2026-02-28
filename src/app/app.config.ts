@@ -7,6 +7,11 @@ import {providePrimeNG} from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
 import {provideHttpClient, withFetch} from '@angular/common/http';
 import {MessageService} from 'primeng/api';
+import { AllCommunityModule, ModuleRegistry } from 'ag-charts-community';
+import { AllEnterpriseModule } from 'ag-charts-enterprise';
+
+// Enable all Community features
+ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
 export const appConfig: ApplicationConfig = {
   providers: [

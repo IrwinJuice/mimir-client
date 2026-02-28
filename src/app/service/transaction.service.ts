@@ -13,7 +13,7 @@ export interface BankTransaction {
   description: string | null,
   mcc: number | null,
   hold: boolean,
-  transaction_time: number,
+  transaction_time: string,
   receipt_id: string | null,
   balance: number | null,
 }
@@ -40,14 +40,15 @@ export class TransactionService {
       params = params.append("external_id_list", external_id_list.join(','));
     }
     if (mcc_list.length > 0) {
-      params = params.append("mcc_list", external_id_list.join(','));
+      // Fixed: previously appended external_id_list by mistake
+      params = params.append("mcc_list", mcc_list.join(','));
     }
 
     const url = `${environment.apiBase}/users/${idu}/transactions`;
     return this.http.get<BankTransaction[]>(url, {params}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
-        return of(null);
+        return of([] as BankTransaction[]);
       })
     );
   }
