@@ -54,10 +54,6 @@ export class AccountService {
   private _accounts = new BehaviorSubject<Account[]>([]);
   accounts$ = this._accounts.asObservable();
 
-
-  private _time_range = new BehaviorSubject<Date[]>([]);
-  time_range$ = this._time_range.asObservable();
-
   private _monitor_status = new Subject<WebSocketNotification>();
   monitor_status$ = this._monitor_status.asObservable();
 
@@ -67,14 +63,6 @@ export class AccountService {
 
   get accounts(): Account[] {
     return this._accounts.value;
-  }
-
-  set time_range(next: Date[]) {
-    this._time_range.next(next);
-  }
-
-  get time_range(): Date[] {
-    return this._time_range.value;
   }
 
   set monitor_status(notification: WebSocketNotification) {

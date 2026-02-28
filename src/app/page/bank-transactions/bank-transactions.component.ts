@@ -1,14 +1,15 @@
-import {Component, inject, OnInit, PLATFORM_ID} from '@angular/core';
+import {Component, DestroyRef, inject, OnInit, PLATFORM_ID} from '@angular/core';
 import {AsyncPipe, isPlatformBrowser} from '@angular/common';
-import { ChartModule } from 'primeng/chart';
+import {ChartModule} from 'primeng/chart';
 import {Checkbox} from 'primeng/checkbox';
 import {FormsModule} from '@angular/forms';
-import {MessageService} from 'primeng/api';
 import {Mcc, MccService} from '../../service/mcc.service';
-import {Account} from '../../components/account/account';
-import {Divider} from 'primeng/divider';
-import {UserService} from '../../service/user.service';
-import {map, Observable, skip, switchMap, take, tap} from 'rxjs';
+import {User, UserService} from '../../service/user.service';
+import {of, skip, switchMap, tap} from 'rxjs';
+import {BankTransaction, TransactionService} from '../../service/transaction.service';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {DateTimeService} from '../../service/date-time.service';
+import {MessageService} from 'primeng/api';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -16,34 +17,62 @@ import {map, Observable, skip, switchMap, take, tap} from 'rxjs';
     ChartModule,
     Checkbox,
     FormsModule,
-    Account,
-    AsyncPipe,
-    Divider
+    AsyncPipe
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
 })
 export class BankTransactionsComponent implements OnInit {
+  private message = inject(MessageService);
   private mcc_service = inject(MccService);
+  private dt_service = inject(DateTimeService);
   protected user_service = inject(UserService);
+  protected transaction_service = inject(TransactionService);
+  private destroyRef = inject(DestroyRef);
 
-  mcc_list$: Observable<Mcc[]>;
-  mss_selected: [];
+  mcc_list: Mcc[] = [];
+  transactions: BankTransaction[] = [];
+  mss_selected: Mcc[] = [];
 
   data: any;
   options: any;
   platformId = inject(PLATFORM_ID);
 
+  user: User;
+
   ngOnInit() {
     this.initChart();
 
-    this.mcc_list$ = this.user_service.selected_user$.pipe(
+    this.user_service.selected_user$.pipe(
       skip(1),
       switchMap((user) => {
+        this.user = user;
         return this.mcc_service.fetch_mcc_by_idu(user.idu);
       }),
-    )
+      switchMap((mcc_list) => {
+        this.mcc_list = mcc_list;
 
+        let time_range = this.dt_service.time_range;
+        if (!time_range || time_range.length < 2) {
+          this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
+          return of([]);
+        }
+
+        // rangeDates is [start, end] — convert to ISO strings
+        const toDate: Date = time_range[0];
+        const fromDate: Date = time_range[1];
+
+        // Convert to Unix timestamps (seconds since epoch)
+        const to = Math.floor(toDate.getTime() / 1000);
+        const from = Math.floor(fromDate.getTime() / 1000);
+        return this.transaction_service.get_transactions(this.user.idu, [], [], [], from, to)
+      }),
+      tap((t_list) => {
+        this.transactions = t_list;
+        console.log('transactions', t_list)
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
 
   }
 

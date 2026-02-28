@@ -9,6 +9,7 @@ import {Menubar} from 'primeng/menubar';
 import {DatePicker} from 'primeng/datepicker';
 import {Sidebar} from './components/sidebar/sidebar';
 import {WebSocketNotification, WebSocketNotificationKind, WebSocketService} from './service/web-socket-service';
+import {DateTimeService} from './service/date-time.service';
 
 
 @Component({
@@ -18,8 +19,8 @@ import {WebSocketNotification, WebSocketNotificationKind, WebSocketService} from
   styleUrl: './app.scss',
 })
 export class App implements OnInit {
-  stats_loading = false;
   private account_service = inject(AccountService);
+  private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private web_socket_service = inject(WebSocketService);
   protected items: MenuItem[];
@@ -33,7 +34,7 @@ export class App implements OnInit {
     const twoMonthsAgo = new Date(now);
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
     this.range_dates = [now, twoMonthsAgo];
-    this.account_service.time_range = this.range_dates;
+    this.dt_service.time_range = this.range_dates;
 
     this.web_socket_service.connect().subscribe({
       next: (msg) => {
@@ -76,7 +77,7 @@ export class App implements OnInit {
   }
 
   protected onRangeChange() {
-    this.account_service.time_range = this.range_dates;
+    this.dt_service.time_range = this.range_dates;
   }
 
 }

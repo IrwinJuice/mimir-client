@@ -21,6 +21,7 @@ import {DateTime} from 'luxon';
 import * as cc from 'currency-codes';
 import {ProgressBar} from 'primeng/progressbar';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {DateTimeService} from '../../service/date-time.service';
 
 interface Column {
   field: string;
@@ -53,6 +54,7 @@ export class Account implements OnInit {
 
   private formBuilder = inject(FormBuilder);
   private account_service = inject(AccountService);
+  private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
@@ -197,7 +199,7 @@ export class Account implements OnInit {
   // Use date-picker rangeDates to call stats endpoint
   fetch_stats() {
     this.loading = true;
-    let time_range = this.account_service.time_range;
+    let time_range = this.dt_service.time_range;
     if (!time_range || time_range.length < 2) {
       this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
       this.loading = false;
