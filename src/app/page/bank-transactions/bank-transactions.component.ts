@@ -102,13 +102,13 @@ export class BankTransactionsComponent implements OnInit {
     console.log(groups)
 
     const series = groups.map(([external_id, items]) => ({
-      type: "bar",
+      type: "scatter",
       width: 10,
       xKey: "time",
       yKey: "amount_" + external_id,
       yName: external_id,
-      stacked: true,
-      normalizedTo: 100,
+      // stacked: true,
+      // normalizedTo: 100,
       tooltip: {
         renderer: ({datum}: { datum: any }) => ({
           title: external_id,
@@ -124,7 +124,7 @@ export class BankTransactionsComponent implements OnInit {
         visible: false
       },
       zoom: {enabled: true, minVisibleItems: 1},
-      navigator: {enabled: true, miniChart: {enabled: true}},
+      // navigator: {enabled: true, miniChart: {enabled: true}},
       tooltip: {enabled: true},
       axes: [
         {
@@ -164,7 +164,7 @@ export class BankTransactionsComponent implements OnInit {
         return {
           time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
           external_id: t.external_id,
-          [amount_key]: t.amount
+          [amount_key]: t.amount / 100
         };
       });
   }
