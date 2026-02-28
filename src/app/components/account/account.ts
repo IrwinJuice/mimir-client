@@ -13,7 +13,7 @@ import {
   AccountService,
   CreateAccount
 } from '../../service/account.service';
-import {finalize, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
+import {finalize, map, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
 import {MessageService, TreeNode} from 'primeng/api';
 import {User} from '../../service/user.service';
 import {TreeTableModule} from 'primeng/treetable';
@@ -144,14 +144,14 @@ export class Account implements OnInit {
               tap((m) => {
                 console.log('m', m)
                 monitor.data = {
-                    // include ida and external_id for reliable future lookups
-                    ida: m.ida,
-                    external_id: m.external_id,
-                    kind: m.masked_pan,
-                    loading: m.status === AccountMonitorStatus.PENDING,
-                    balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                    updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                    last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  // include ida and external_id for reliable future lookups
+                  ida: m.ida,
+                  external_id: m.external_id,
+                  kind: m.masked_pan,
+                  loading: m.status === AccountMonitorStatus.PENDING,
+                  balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
+                  updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
                 };
                 this.accountsTree = [...this.accountsTree];
                 this.cdr.detectChanges();
@@ -163,6 +163,7 @@ export class Account implements OnInit {
         }),
       )
       .subscribe();
+
   }
 
   add_account() {

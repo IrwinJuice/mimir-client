@@ -1,21 +1,34 @@
 import {Component, inject, OnInit, PLATFORM_ID} from '@angular/core';
-import {isPlatformBrowser} from '@angular/common';
+import {AsyncPipe, isPlatformBrowser} from '@angular/common';
 import { ChartModule } from 'primeng/chart';
 import {Checkbox} from 'primeng/checkbox';
 import {FormsModule} from '@angular/forms';
+import {MessageService} from 'primeng/api';
+import {Mcc, MccService} from '../../service/mcc.service';
+import {Account} from '../../components/account/account';
+import {Divider} from 'primeng/divider';
+import {UserService} from '../../service/user.service';
+import {map, Observable, skip, switchMap, take, tap} from 'rxjs';
 
 @Component({
   selector: 'app-bank-transaction',
   imports: [
     ChartModule,
     Checkbox,
-    FormsModule
+    FormsModule,
+    Account,
+    AsyncPipe,
+    Divider
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
 })
 export class BankTransactionsComponent implements OnInit {
-  pizza: string[] = [];
+  private mcc_service = inject(MccService);
+  protected user_service = inject(UserService);
+
+  mcc_list$: Observable<Mcc[]>;
+  mss_selected: [];
 
   data: any;
   options: any;
@@ -23,6 +36,15 @@ export class BankTransactionsComponent implements OnInit {
 
   ngOnInit() {
     this.initChart();
+
+    this.mcc_list$ = this.user_service.selected_user$.pipe(
+      skip(1),
+      switchMap((user) => {
+        return this.mcc_service.fetch_mcc_by_idu(user.idu);
+      }),
+    )
+
+
   }
 
   initChart() {
@@ -86,5 +108,9 @@ export class BankTransactionsComponent implements OnInit {
       };
       // this.cd.markForCheck();
     }
+  }
+
+  protected onSelect($event: any) {
+    console.log("event", $event)
   }
 }
