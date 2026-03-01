@@ -97,18 +97,18 @@ export class BankTransactionsComponent implements OnInit {
 
   }
 
-  setup_chart(data: { time: Date, external_id: string, [key: string]: Date | string | number }[]) {
+  setup_chart(data: { time: Date, external_id: string, size_key: number, [key: string]: Date | string | number }[]) {
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
     console.log(groups)
 
     const series = groups.map(([external_id, items]) => ({
-      type: "scatter",
-      width: 10,
+      type: "bubble",
+      sizeKey: "size_key",
       xKey: "time",
       yKey: "amount_" + external_id,
       yName: external_id,
-      // stacked: true,
-      // normalizedTo: 100,
+      size: 10, //defaults to 7
+      maxSize: 30, //defaults to 30
       tooltip: {
         renderer: ({datum}: { datum: any }) => ({
           title: external_id,
@@ -124,7 +124,7 @@ export class BankTransactionsComponent implements OnInit {
         visible: false
       },
       zoom: {enabled: true, minVisibleItems: 1},
-      // navigator: {enabled: true, miniChart: {enabled: true}},
+      navigator: {enabled: true, miniChart: {enabled: true}},
       tooltip: {enabled: true},
       axes: [
         {
@@ -152,7 +152,7 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   // Build chart data: x = transaction_time (Date), y = amount (kopecks as-is)
-  private buildChartByDate(): { time: Date, external_id: string, [key: string]: Date | string | number }[] {
+  private buildChartByDate(): { time: Date, external_id: string, size_key: number, [key: string]: Date | string | number }[] {
     if (!this.transactions || this.transactions.length === 0) {
       return [];
     }
@@ -164,7 +164,8 @@ export class BankTransactionsComponent implements OnInit {
         return {
           time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
           external_id: t.external_id,
-          [amount_key]: t.amount / 100
+          size_key: Math.abs(t.amount),
+          [amount_key]: t.amount / 100,
         };
       });
   }
