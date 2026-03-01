@@ -1,7 +1,8 @@
-<p-menubar class="mb-4">
+<p-menubar class="mb-4" [model]="items">
   <ng-template #start>
     <p-date-picker [(ngModel)]="range_dates" (ngModelChange)="onRangeChange()" selectionMode="range"
                    [readonlyInput]="true"/>
+
   </ng-template>
   <ng-template #end>
     <theme-switcher/>

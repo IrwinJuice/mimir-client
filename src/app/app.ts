@@ -10,6 +10,7 @@ import {DatePicker} from 'primeng/datepicker';
 import {Sidebar} from './components/sidebar/sidebar';
 import {WebSocketNotification, WebSocketNotificationKind, WebSocketService} from './service/web-socket-service';
 import {DateTimeService} from './service/date-time.service';
+import {TransactionService} from './service/transaction.service';
 
 
 @Component({
@@ -20,6 +21,7 @@ import {DateTimeService} from './service/date-time.service';
 })
 export class App implements OnInit {
   private account_service = inject(AccountService);
+  private transaction_service = inject(TransactionService);
   private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private web_socket_service = inject(WebSocketService);
@@ -27,6 +29,31 @@ export class App implements OnInit {
 
   range_dates: Date[];
 
+  constructor() {
+    this.items = [
+      {
+        label: 'Export',
+        icon: 'pi pi-file-export',
+        items: [
+          {
+            label: 'CSV',
+            icon: 'pi pi-file-plus',
+            command: _ => this.download_csv()
+          },
+          {
+            label: 'XLSX',
+            icon: 'pi pi-file-excel',
+            command: _ => this.download_xlsx()
+          },
+          {
+            label: 'JSON',
+            icon: 'pi pi-file',
+            command: _ => this.download_json()
+          }
+        ]
+      }
+    ]
+  }
 
   ngOnInit(): void {
     const now = new Date();
@@ -78,6 +105,36 @@ export class App implements OnInit {
 
   protected onRangeChange() {
     this.dt_service.time_range = this.range_dates;
+  }
+
+
+  download_csv() {
+    const filter = this.transaction_service.last_transactions_filter;
+    if (!filter) {
+      this.message.add({severity: 'warn', summary: 'CSV', detail: 'No transactions loaded yet.'});
+      return;
+    }
+    this.transaction_service.download_csv(filter);
+  }
+
+
+  download_xlsx() {
+    const filter = this.transaction_service.last_transactions_filter;
+    if (!filter) {
+      this.message.add({severity: 'warn', summary: 'CSV', detail: 'No transactions loaded yet.'});
+      return;
+    }
+    this.transaction_service.download_xlsx(filter);
+  }
+
+
+  download_json() {
+    const filter = this.transaction_service.last_transactions_filter;
+    if (!filter) {
+      this.message.add({severity: 'warn', summary: 'CSV', detail: 'No transactions loaded yet.'});
+      return;
+    }
+    this.transaction_service.download_json(filter);
   }
 
 }

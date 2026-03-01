@@ -18,7 +18,50 @@
           <ag-charts class="flex-1 block" style="height: 100%; min-height: calc(100vh - 400px)" [options]="options"></ag-charts>
         </p-tabpanel>
         <p-tabpanel value="1">
-
+          <p-table [value]="transactions"
+                   [tableStyle]="{ 'min-width': '50rem' } "
+                   [paginator]="true"
+                   [showCurrentPageReport]="true"
+                   currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
+                   [rows]="50"
+                   [rowsPerPageOptions]="[50, 100, 200]">
+            <ng-template #header>
+              <tr>
+                <th>Mask</th>
+                <th>Amount</th>
+                <th>Currency</th>
+<!--                <th>Currency Code</th>-->
+                <th>Description</th>
+                <th>T. time</th>
+                <th>Receipt ID</th>
+                <th>MCC</th>
+                <th>MCC Description</th>
+<!--                <th>ID</th>-->
+<!--                <th>External ID</th>-->
+<!--                <th>IDA</th>-->
+                <th>Hold</th>
+                <th>Balance</th>
+              </tr>
+            </ng-template>
+            <ng-template #body let-transaction>
+              <tr >
+                <td>{{ transaction.masked_pan }}</td>
+                <td>{{ transaction.amount / 100 }}</td>
+                <td>{{ transaction.currency }}</td>
+<!--                <td>{{ transaction.currency_code }}</td>-->
+                <td>{{ transaction.description }}</td>
+                <td>{{ to_uk_date(transaction.transaction_time) }}</td>
+                <td>{{ transaction.receipt_id }}</td>
+                <td>{{ transaction.mcc }}</td>
+                <td>{{ transaction.mcc_description }}</td>
+<!--                <td>{{ transaction.id }}</td>-->
+<!--                <td>{{ transaction.external_id }}</td>-->
+<!--                <td>{{ transaction.ida }}</td>-->
+                <td>{{ transaction.hold }}</td>
+                <td>{{ transaction.balance }}</td>
+              </tr>
+            </ng-template>
+          </p-table>
         </p-tabpanel>
       </p-tabpanels>
     </p-tabs>

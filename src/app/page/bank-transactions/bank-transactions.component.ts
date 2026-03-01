@@ -5,7 +5,7 @@ import {FormsModule} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
 import {User, UserService} from '../../service/user.service';
 import {of, skip, switchMap, tap} from 'rxjs';
-import {BankTransaction, TransactionService} from '../../service/transaction.service';
+import {BankTransaction, BankTransactionFilter, TransactionService} from '../../service/transaction.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
@@ -13,6 +13,7 @@ import {AgCharts} from 'ag-charts-angular';
 import {DateTime} from 'luxon';
 import {ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
+import {TableModule} from 'primeng/table';
 
 // Chart Options Type Interface
 
@@ -28,6 +29,8 @@ import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
     TabList,
     Tab,
     TabPanels,
+    TableModule,
+
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -91,7 +94,15 @@ export class BankTransactionsComponent implements OnInit {
         // Convert to Unix timestamps (seconds since epoch)
         const to = Math.floor(toDate.getTime() / 1000);
         const from = Math.floor(fromDate.getTime() / 1000);
-        return this.transaction_service.get_transactions(this.user.idu, [], [], [], from, to)
+        const filter: BankTransactionFilter = {
+          external_id_list: [],
+          ida_list: [],
+          mcc_list: [],
+          idu: this.user.idu,
+          from,
+          to
+        }
+        return this.transaction_service.get_transactions(filter)
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
@@ -158,7 +169,12 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   // Build chart data: x = transaction_time (Date), y = amount (kopecks as-is)
-  private buildChartByDate(): { time: Date, external_id: string, size_key: number, [key: string]: Date | string | number }[] {
+  private buildChartByDate(): {
+    time: Date,
+    external_id: string,
+    size_key: number,
+    [key: string]: Date | string | number
+  }[] {
     if (!this.transactions || this.transactions.length === 0) {
       return [];
     }
@@ -186,5 +202,11 @@ export class BankTransactionsComponent implements OnInit {
   trackByMcc(index: number, item: Mcc) {
     return item.mcc;
   }
+
+
+  to_uk_date(date: string) {
+    return DateTime.fromISO(date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS);
+  }
+
 
 }
