@@ -33,7 +33,7 @@ export class App implements OnInit {
     // set range to now and two months ago
     const twoMonthsAgo = new Date(now);
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    this.range_dates = [now, twoMonthsAgo];
+    this.range_dates = [twoMonthsAgo, now];
     this.dt_service.time_range = this.range_dates;
 
     this.web_socket_service.connect().subscribe({

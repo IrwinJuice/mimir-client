@@ -207,8 +207,8 @@ export class Account implements OnInit {
     }
 
     // rangeDates is [start, end] — convert to ISO strings (strip timezone if needed)
-    const toDate: Date = time_range[0];
-    const fromDate: Date = time_range[1];
+    const toDate: Date = time_range[1];
+    const fromDate: Date = time_range[0];
 
     // Convert to Unix timestamps (seconds since epoch)
     const to = Math.floor(toDate.getTime() / 1000);

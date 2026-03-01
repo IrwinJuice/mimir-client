@@ -12,6 +12,7 @@ import {MessageService} from 'primeng/api';
 import {AgCharts} from 'ag-charts-angular';
 import {DateTime} from 'luxon';
 import {ThemeService} from '../../service/theme.service';
+import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 
 // Chart Options Type Interface
 
@@ -22,6 +23,11 @@ import {ThemeService} from '../../service/theme.service';
     Checkbox,
     FormsModule,
     AgCharts,
+    Tabs,
+    TabPanel,
+    TabList,
+    Tab,
+    TabPanels,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -79,8 +85,8 @@ export class BankTransactionsComponent implements OnInit {
         }
 
         // rangeDates is [start, end] — convert to ISO strings
-        const toDate: Date = time_range[0];
-        const fromDate: Date = time_range[1];
+        const toDate: Date = time_range[1];
+        const fromDate: Date = time_range[0];
 
         // Convert to Unix timestamps (seconds since epoch)
         const to = Math.floor(toDate.getTime() / 1000);

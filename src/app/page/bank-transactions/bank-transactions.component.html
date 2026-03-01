@@ -7,7 +7,20 @@
       </div>
     }
   </div>
-  <div class="card"  style="height: calc(100vh - 500px);">
-    <ag-charts class="flex-1 block" style="height: 100%; min-height: 400px" [options]="options"></ag-charts>
+  <div class="card">
+    <p-tabs value="0" >
+      <p-tablist>
+        <p-tab value="0">Графік</p-tab>
+        <p-tab value="1">Таблиця</p-tab>
+      </p-tablist>
+      <p-tabpanels>
+        <p-tabpanel value="0">
+          <ag-charts class="flex-1 block" style="height: 100%; min-height: calc(100vh - 400px)" [options]="options"></ag-charts>
+        </p-tabpanel>
+        <p-tabpanel value="1">
+
+        </p-tabpanel>
+      </p-tabpanels>
+    </p-tabs>
   </div>
 </div>
