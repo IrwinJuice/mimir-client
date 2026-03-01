@@ -40,7 +40,7 @@ export class BankTransactionsComponent implements OnInit {
   private mcc_service = inject(MccService);
   private dt_service = inject(DateTimeService);
   protected user_service = inject(UserService);
-  protected transaction_service = inject(TransactionService);
+  protected t_service = inject(TransactionService);
   private destroyRef = inject(DestroyRef);
 
   mcc_list: Mcc[] = [];
@@ -49,6 +49,7 @@ export class BankTransactionsComponent implements OnInit {
 
   data: any = {labels: [], datasets: []};
   options: any;
+  options_pie: any;
 
   user: User;
 
@@ -61,12 +62,16 @@ export class BankTransactionsComponent implements OnInit {
     effect(() => {
       const state = this.themeState();
       const options = {...this.options};
+      const options_pie = {...this.options_pie};
       if (state.darkTheme) {
         options.theme = "ag-default-dark";
+        options_pie.theme = "ag-default-dark";
       } else {
         options.theme = "ag-default";
+        options_pie.theme = "ag-default";
       }
       this.options = options;
+      this.options_pie = options_pie;
     });
   }
 
@@ -87,7 +92,6 @@ export class BankTransactionsComponent implements OnInit {
           return of([] as BankTransaction[]);
         }
 
-        // rangeDates is [start, end] — convert to ISO strings
         const toDate: Date = time_range[1];
         const fromDate: Date = time_range[0];
 
@@ -102,7 +106,36 @@ export class BankTransactionsComponent implements OnInit {
           from,
           to
         }
-        return this.transaction_service.get_transactions(filter)
+        return this.t_service.get_transactions(filter)
+      }),
+      tap((t_list) => {
+        this.transactions = t_list || [];
+        console.log(this.transactions);
+        this.setup_chart(this.buildChartByDate());
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+
+    this.dt_service.time_range$.pipe(
+      skip(1),
+      switchMap((time_range) => {
+        if (!time_range || time_range.length < 2) {
+          this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
+          return of([] as BankTransaction[]);
+        }
+        const toDate: Date = time_range[1];
+        const fromDate: Date = time_range[0];
+        // Convert to Unix timestamps (seconds since epoch)
+        const to = Math.floor(toDate.getTime() / 1000);
+        const from = Math.floor(fromDate.getTime() / 1000);
+
+        let filter: BankTransactionFilter = {
+          ...this.t_service.last_transactions_filter,
+          from,
+          to
+        };
+        this.t_service.last_transactions_filter = filter;
+        return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
@@ -161,11 +194,56 @@ export class BankTransactionsComponent implements OnInit {
       series,
     };
 
+    const series_pie = groups.map(([external_id, items]) => ({
+      type: "pie",
+      angleKey: 'amount_key',
+      legendItemKey: 'external_id',
+      // sizeKey: "size_key",
+      // xKey: "time",
+      // yKey: "amount_" + external_id,
+      // yName: external_id,
+      // size: 10, //defaults to 7
+      // maxSize: 30, //defaults to 30
+      tooltip: {
+        renderer: ({datum}: { datum: any }) => ({
+          title: external_id,
+          content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
+        }),
+      },
+    }));
+    let options_pie = {
+      theme: "ag-default",
+      background: {
+        visible: false
+      },
+      // zoom: {enabled: true, minVisibleItems: 1},
+      // navigator: {enabled: true, miniChart: {enabled: true}},
+      tooltip: {enabled: true},
+      // axes: [
+      //   {
+      //     type: "time",
+      //     position: "bottom",
+      //     label: {format: "%d.%m %H:%M", autoRotate: true},
+      //   },
+      //   {
+      //     type: "number",
+      //     position: "left",
+      //     label: {
+      //       formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
+      //     },
+      //   },
+      // ],
+      data,
+      series_pie,
+    };
+
     const state = this.themeState();
     if (state.darkTheme) {
       options.theme = "ag-default-dark";
+      options_pie.theme = "ag-default-dark";
     }
     this.options = options;
+    this.options_pie = options_pie;
   }
 
   // Build chart data: x = transaction_time (Date), y = amount (kopecks as-is)

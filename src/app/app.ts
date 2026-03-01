@@ -103,8 +103,10 @@ export class App implements OnInit {
     })
   }
 
-  protected onRangeChange() {
-    this.dt_service.time_range = this.range_dates;
+  protected onRangeChange(range: [Date, Date]) {
+    if (range[0] && range[1]) {
+      this.dt_service.time_range = this.range_dates;
+    }
   }
 
 
