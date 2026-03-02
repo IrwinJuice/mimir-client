@@ -1,7 +1,7 @@
 import {Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
 import {ChartModule} from 'primeng/chart';
 import {Checkbox} from 'primeng/checkbox';
-import {FormsModule} from '@angular/forms';
+import {AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
 import {User, UserService} from '../../service/user.service';
 import {of, skip, switchMap, tap} from 'rxjs';
@@ -17,6 +17,8 @@ import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
 import {Divider} from 'primeng/divider';
 import {Button} from 'primeng/button';
+import {Select} from 'primeng/select';
+import {InputText} from 'primeng/inputtext';
 
 // Chart Options Type Interface
 
@@ -26,6 +28,7 @@ import {Button} from 'primeng/button';
     ChartModule,
     Checkbox,
     FormsModule,
+    ReactiveFormsModule,
     AgCharts,
     Tabs,
     TabPanel,
@@ -36,7 +39,8 @@ import {Button} from 'primeng/button';
     SelectButton,
     Divider,
     Button,
-
+    Select,
+    InputText,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -48,6 +52,7 @@ export class BankTransactionsComponent implements OnInit {
   protected user_service = inject(UserService);
   protected t_service = inject(TransactionService);
   private destroyRef = inject(DestroyRef);
+  private fb = inject(FormBuilder);
 
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
@@ -62,6 +67,8 @@ export class BankTransactionsComponent implements OnInit {
   themeState = this.theme_service.themeState;
   chart_options = [];
   chart_idx = 1;
+
+  filter_exceptions: FormArray = this.fb.array([]);
 
   constructor() {
     this.chart_options = [
@@ -399,6 +406,14 @@ export class BankTransactionsComponent implements OnInit {
   // }
 
   protected add_filter_exception() {
+    const exceptionGroup: FormGroup = this.fb.group({
+      mcc: [null],
+      description: [''],
+    });
+    this.filter_exceptions.push(exceptionGroup);
+  }
 
+  asFormGroup(control: AbstractControl): FormGroup {
+    return control as FormGroup;
   }
 }

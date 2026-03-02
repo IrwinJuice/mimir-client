@@ -12,6 +12,20 @@
 
     <p-button label="Додати виключення" icon="pi pi-plus" (click)="add_filter_exception()"/>
 
+    @for (row of filter_exceptions.controls; track $index) {
+      <div class="flex items-center gap-2 w-full" [formGroup]="asFormGroup(row)">
+        <p-select formControlName="mcc"
+                  [options]="mcc_list"
+                  optionLabel="shortDescription.uk"
+                  placeholder="Оберіть MCC"
+                  [filter]="true"
+                  filterBy="mcc,shortDescription.uk"
+                  class="flex-1"/>
+        <input pInputText formControlName="description" placeholder="Опис" class="flex-1"/>
+        <p-button icon="pi pi-trash" severity="danger" (click)="filter_exceptions.removeAt($index)"/>
+      </div>
+    }
+
 
 
   </div>
