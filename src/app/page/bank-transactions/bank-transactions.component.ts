@@ -14,6 +14,9 @@ import {DateTime} from 'luxon';
 import {ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
+import {SelectButton} from 'primeng/selectbutton';
+import {Divider} from 'primeng/divider';
+import {Button} from 'primeng/button';
 
 // Chart Options Type Interface
 
@@ -30,6 +33,9 @@ import {TableModule} from 'primeng/table';
     Tab,
     TabPanels,
     TableModule,
+    SelectButton,
+    Divider,
+    Button,
 
   ],
   templateUrl: './bank-transactions.component.html',
@@ -45,33 +51,34 @@ export class BankTransactionsComponent implements OnInit {
 
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
-  mss_selected: Mcc[] = [];
+  mcc_selected: Mcc[] = [];
 
   data: any = {labels: [], datasets: []};
   options: any;
-  options_pie: any;
 
   user: User;
 
   theme_service = inject(ThemeService);
   themeState = this.theme_service.themeState;
+  chart_options = [];
+  chart_idx = 1;
 
   constructor() {
-    this.setup_chart([]);
+    this.chart_options = [
+      { name: 'Загальна', chart_idx: 1 },
+      { name: 'Option 2', chart_idx: 2 },
+      { name: 'Option 3', chart_idx: 3 }
+    ];
 
     effect(() => {
       const state = this.themeState();
       const options = {...this.options};
-      const options_pie = {...this.options_pie};
       if (state.darkTheme) {
         options.theme = "ag-default-dark";
-        options_pie.theme = "ag-default-dark";
       } else {
         options.theme = "ag-default";
-        options_pie.theme = "ag-default";
       }
       this.options = options;
-      this.options_pie = options_pie;
     });
   }
 
@@ -110,8 +117,7 @@ export class BankTransactionsComponent implements OnInit {
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        console.log(this.transactions);
-        this.setup_chart(this.buildChartByDate());
+        this.on_chart_select(this.chart_idx);
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -139,17 +145,53 @@ export class BankTransactionsComponent implements OnInit {
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        console.log(this.transactions);
-        this.setup_chart(this.buildChartByDate());
+        this.on_chart_select(this.chart_idx);
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
   }
 
-  setup_chart(data: { time: Date, external_id: string, size_key: number, [key: string]: Date | string | number }[]) {
+  protected on_mcc_select($event: any) {
+    // if (Array.isArray($event)) {
+    //   this.mcc_selected = $event;
+    // }
+  }
+
+  trackByMcc(index: number, item: Mcc) {
+    return item.mcc;
+  }
+
+
+  to_uk_date(date: string) {
+    return DateTime.fromISO(date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS);
+  }
+
+
+  on_chart_select(idx: number) {
+    switch(idx) {
+      case 1: this.draw_main_chart()
+        break;
+      case 2: this.draw_income_outcome()
+        break;
+    }
+
+  }
+
+  draw_main_chart() {
+
+    let data = [...this.transactions]
+      .map(t => {
+        let amount_key = 'amount_' + t.external_id;
+        return {
+          time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
+          external_id: t.external_id,
+          size_key: Math.abs(t.amount),
+          [amount_key]: t.amount / 100,
+        };
+      });
+
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
-    console.log(groups)
 
     const series = groups.map(([external_id, items]) => ({
       type: "bubble",
@@ -194,97 +236,169 @@ export class BankTransactionsComponent implements OnInit {
       series,
     };
 
-    const series_pie = groups.map(([external_id, items]) => ({
-      type: "pie",
-      angleKey: 'amount_key',
-      legendItemKey: 'external_id',
-      // sizeKey: "size_key",
-      // xKey: "time",
-      // yKey: "amount_" + external_id,
-      // yName: external_id,
-      // size: 10, //defaults to 7
-      // maxSize: 30, //defaults to 30
-      tooltip: {
-        renderer: ({datum}: { datum: any }) => ({
-          title: external_id,
-          content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
-        }),
-      },
-    }));
-    let options_pie = {
-      theme: "ag-default",
-      background: {
-        visible: false
-      },
-      // zoom: {enabled: true, minVisibleItems: 1},
-      // navigator: {enabled: true, miniChart: {enabled: true}},
-      tooltip: {enabled: true},
-      // axes: [
-      //   {
-      //     type: "time",
-      //     position: "bottom",
-      //     label: {format: "%d.%m %H:%M", autoRotate: true},
-      //   },
-      //   {
-      //     type: "number",
-      //     position: "left",
-      //     label: {
-      //       formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
-      //     },
-      //   },
-      // ],
-      data,
-      series_pie,
-    };
 
     const state = this.themeState();
     if (state.darkTheme) {
       options.theme = "ag-default-dark";
-      options_pie.theme = "ag-default-dark";
     }
     this.options = options;
-    this.options_pie = options_pie;
   }
 
-  // Build chart data: x = transaction_time (Date), y = amount (kopecks as-is)
-  private buildChartByDate(): {
-    time: Date,
-    external_id: string,
-    size_key: number,
-    [key: string]: Date | string | number
-  }[] {
-    if (!this.transactions || this.transactions.length === 0) {
-      return [];
-    }
 
-    return [...this.transactions]
-      .sort((a, b) => a.transaction_time.localeCompare(b.transaction_time))
-      .map(t => {
-        let amount_key = 'amount_' + t.external_id;
+  draw_income_outcome() {
+    // Group transactions by "YYYY-MM" month key
+    const groups = Object.groupBy(
+      this.transactions,
+      (t) => DateTime.fromISO(t.transaction_time, { zone: 'utc' }).toFormat('yyyy-MM')
+    );
+
+
+    // Sum positive amounts (income) per month
+    const data = Object.entries(groups)
+      .map(([month, items]) => {
+        const outcome = (items ?? [])
+          .filter(t => t.amount < 0)
+          .reduce((sum, t) => sum + t.amount, 0);
+        const income = (items ?? [])
+          .filter(t => t.amount > 0)
+          .reduce((sum, t) => sum + t.amount, 0);
         return {
-          time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
-          external_id: t.external_id,
-          size_key: Math.abs(t.amount),
-          [amount_key]: t.amount / 100,
+          month,
+          income: Math.abs(income) / 100,  // positive value, UAH
+          outcome: Math.abs(outcome) / 100,  // positive value, UAH
         };
-      });
+      })
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    console.log(data)
+
+    const options: any = {
+      theme: this.themeState().darkTheme ? 'ag-default-dark' : 'ag-default',
+      background: { visible: false },
+      data,
+      series: [
+        {
+          type: 'line',
+          xKey: 'month',
+          yKey: 'outcome',
+          yName: 'Витрати (UAH)',
+          tooltip: {
+            renderer: ({ datum }: { datum: any }) => ({
+              title: datum.month,
+              content: `Витрати: ${datum.outcome.toFixed(2)} UAH`,
+            }),
+          },
+        },
+        {
+          type: 'line',
+          xKey: 'month',
+          yKey: 'income',
+          yName: 'Дохід (UAH)',
+          tooltip: {
+            renderer: ({ datum }: { datum: any }) => ({
+              title: datum.month,
+              content: `Дохід: ${datum.outcome.toFixed(2)} UAH`,
+            }),
+          },
+        },
+      ],
+      axes: [
+        { type: 'category', position: 'bottom', label: { autoRotate: true } },
+        { type: 'number', position: 'left' },
+      ],
+    };
+
+    this.options = options;
   }
+  //
+  //   let radar: {angle_key: string, radius_key: number, radius_name: string}[] = []
+  //
+  //   this.transactions.map((tr) => {
+  //     if (tr.amount < 0) {
+  //
+  //     }
+  //   })
+  //
+  //   // // let groups_by_masked_pan = Map.groupBy(this.transactions, ({masked_pan}) => masked_pan);
+  //   //
+  //   // let groups = Map.groupBy(this.transactions, ({mcc}) => mcc);
+  //   // groups.forEach((value, key) => {
+  //   //   radar.push({})
+  //   // })
+  //
+  //
+  //   { type: 'radar-area', angleKey: 'department', radiusKey: 'quality', radiusName: `Quality` },
+  //
 
-  protected onSelect($event: any) {
-    if (Array.isArray($event)) {
-      this.mss_selected = $event;
-    }
-    this.setup_chart(this.buildChartByDate());
+    // let data = [...this.transactions]
+    //
+    //   .map(t => {
+    //     let amount_key = 'amount_' + t.external_id;
+    //     return {
+    //       angleKey:
+    //       external_id: t.external_id,
+    //       size_key: Math.abs(t.amount),
+    //       [amount_key]: t.amount / 100,
+    //     };
+    //   });
+    // const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
+    //
+    //
+    // const series = groups.map(([external_id, items]) => ({
+    //   type: "pie",
+    //   angleKey: 'amount',
+    //   legendItemKey: 'asset',
+    //   sizeKey: "size_key",
+    //   xKey: "time",
+    //   yKey: "amount_" + external_id,
+    //   yName: external_id,
+    //   size: 10, //defaults to 7
+    //   maxSize: 30, //defaults to 30
+    //   tooltip: {
+    //     renderer: ({datum}: { datum: any }) => ({
+    //       title: external_id,
+    //       content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
+    //     }),
+    //   },
+    // }));
+    //
+    //
+    // let options = {
+    //   theme: "ag-default",
+    //   background: {
+    //     visible: false
+    //   },
+    //   zoom: {enabled: true, minVisibleItems: 1},
+    //   navigator: {enabled: true, miniChart: {enabled: true}},
+    //   tooltip: {enabled: true},
+    //   axes: [
+    //     {
+    //       type: "time",
+    //       position: "bottom",
+    //       label: {format: "%d.%m %H:%M", autoRotate: true},
+    //     },
+    //     {
+    //       type: "number",
+    //       position: "left",
+    //       label: {
+    //         formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
+    //       },
+    //     },
+    //   ],
+    //   data,
+    //   series,
+    // };
+    //
+    //
+    // const state = this.themeState();
+    // if (state.darkTheme) {
+    //   options.theme = "ag-default-dark";
+    // }
+    // this.options = options;
+
+  // }
+
+  protected add_filter_exception() {
+
   }
-
-  trackByMcc(index: number, item: Mcc) {
-    return item.mcc;
-  }
-
-
-  to_uk_date(date: string) {
-    return DateTime.fromISO(date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS);
-  }
-
-
 }
