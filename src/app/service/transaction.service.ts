@@ -22,11 +22,24 @@ export interface BankTransaction {
 
 }
 
+export interface FilterCondition {
+  field: string;      // 'amount' | 'currency' | 'description' | 'receipt_id' | 'mcc'
+  operator: string;   // 'eq' | 'neq' | 'lt' | 'gt' | 'lte' | 'gte' | 'startsWith' | 'endsWith' | 'contains'
+  value: string;
+}
+
+// One exception = combinator + (cond1 AND cond2 AND ...)
+// combinator examples: 'AND NOT', 'AND', 'OR NOT', 'OR'
+export interface FilterException {
+  combinator: string;
+  conditions: FilterCondition[];
+}
+
 export interface BankTransactionFilter {
   idu: number,
   ida_list: number[],
   external_id_list: string[],
-  mcc_list: string[],
+  exceptions?: FilterException[],
   from: string | number,
   to: string | number
 }
@@ -46,24 +59,8 @@ export class TransactionService {
   // Fetch transactions monitor by external_id
   get_transactions(filter: BankTransactionFilter): Observable<BankTransaction[]> {
     this.last_transactions_filter = filter;
-
-    let params = new HttpParams();
-    params = params.append("from", filter.from);
-    params = params.append("to", filter.to);
-
-    if (filter.ida_list.length > 0) {
-      params = params.append("ida_list", filter.ida_list.join(','));
-    }
-    if (filter.external_id_list.length > 0) {
-      params = params.append("external_id_list", filter.external_id_list.join(','));
-    }
-    if (filter.mcc_list.length > 0) {
-      // Fixed: previously appended external_id_list by mistake
-      params = params.append("mcc_list", filter.mcc_list.join(','));
-    }
-
     const url = `${environment.apiBase}/users/${filter.idu}/transactions`;
-    return this.http.get<BankTransaction[]>(url, {params}).pipe(
+    return this.http.post<BankTransaction[]>(url, filter).pipe(
       tap((ts) => this.current_transactions = ts),
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
@@ -74,22 +71,9 @@ export class TransactionService {
 
   // Download transactions as CSV file
   download_csv(filter: BankTransactionFilter): void {
-    let params = new HttpParams();
-    params = params.append("from", filter.from);
-    params = params.append("to", filter.to);
-
-    if (filter.ida_list.length > 0) {
-      params = params.append("ida_list", filter.ida_list.join(','));
-    }
-    if (filter.external_id_list.length > 0) {
-      params = params.append("external_id_list", filter.external_id_list.join(','));
-    }
-    if (filter.mcc_list.length > 0) {
-      params = params.append("mcc_list", filter.mcc_list.join(','));
-    }
 
     const url = `${environment.apiBase}/users/${filter.idu}/transactions/csv`;
-    this.http.get(url, {params, responseType: 'blob', observe: 'response'}).pipe(
+    this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
         return of(null);
@@ -117,22 +101,9 @@ export class TransactionService {
 
   // Download transactions as xlsx file
   download_xlsx(filter: BankTransactionFilter): void {
-    let params = new HttpParams();
-    params = params.append("from", filter.from);
-    params = params.append("to", filter.to);
-
-    if (filter.ida_list.length > 0) {
-      params = params.append("ida_list", filter.ida_list.join(','));
-    }
-    if (filter.external_id_list.length > 0) {
-      params = params.append("external_id_list", filter.external_id_list.join(','));
-    }
-    if (filter.mcc_list.length > 0) {
-      params = params.append("mcc_list", filter.mcc_list.join(','));
-    }
 
     const url = `${environment.apiBase}/users/${filter.idu}/transactions/xlsx`;
-    this.http.get(url, {params, responseType: 'blob', observe: 'response'}).pipe(
+    this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
         return of(null);
@@ -160,22 +131,9 @@ export class TransactionService {
 
   // Download transactions as json file
   download_json(filter: BankTransactionFilter): void {
-    let params = new HttpParams();
-    params = params.append("from", filter.from);
-    params = params.append("to", filter.to);
-
-    if (filter.ida_list.length > 0) {
-      params = params.append("ida_list", filter.ida_list.join(','));
-    }
-    if (filter.external_id_list.length > 0) {
-      params = params.append("external_id_list", filter.external_id_list.join(','));
-    }
-    if (filter.mcc_list.length > 0) {
-      params = params.append("mcc_list", filter.mcc_list.join(','));
-    }
 
     const url = `${environment.apiBase}/users/${filter.idu}/transactions/json`;
-    this.http.get(url, {params, responseType: 'blob', observe: 'response'}).pipe(
+    this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
         return of(null);
