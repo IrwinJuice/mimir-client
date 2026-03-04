@@ -93,11 +93,12 @@
                  [paginator]="true"
                  [showCurrentPageReport]="true"
                  currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
-                 [rows]="50"
-                 [rowsPerPageOptions]="[50, 100, 200]">
+                 [rows]="10"
+                 [rowsPerPageOptions]="[10, 50, 100, 200]">
           <ng-template #header>
             <tr>
               <th>Mask</th>
+              <th>Bank Acc. ID</th>
               <th>Amount</th>
               <th>Currency</th>
               <!--                <th>Currency Code</th>-->
@@ -107,7 +108,6 @@
               <th>MCC</th>
               <th>MCC Description</th>
               <!--                <th>ID</th>-->
-              <!--                <th>External ID</th>-->
               <!--                <th>IDA</th>-->
               <th>Hold</th>
               <th>Balance</th>
@@ -116,6 +116,7 @@
           <ng-template #body let-transaction>
             <tr>
               <td>{{ transaction.masked_pan }}</td>
+              <td>{{ transaction.external_id }}</td>
               <td>{{ transaction.amount / 100 }}</td>
               <td>{{ transaction.currency }}</td>
               <!--                <td>{{ transaction.currency_code }}</td>-->
@@ -125,7 +126,6 @@
               <td>{{ transaction.mcc }}</td>
               <td>{{ transaction.mcc_description }}</td>
               <!--                <td>{{ transaction.id }}</td>-->
-              <!--                <td>{{ transaction.external_id }}</td>-->
               <!--                <td>{{ transaction.ida }}</td>-->
               <td>{{ transaction.hold }}</td>
               <td>{{ transaction.balance }}</td>

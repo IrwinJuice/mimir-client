@@ -25,6 +25,7 @@ import {Select} from 'primeng/select';
 import {InputText} from 'primeng/inputtext';
 import {Fieldset} from 'primeng/fieldset';
 import {Tooltip} from 'primeng/tooltip';
+import {AgBubbleSeriesStylerParams, AgBubbleSeriesStylerResult, AgTooltipRendererResult} from 'ag-charts-enterprise';
 
 export type FilterFieldType = 'number' | 'string';
 
@@ -62,6 +63,7 @@ const FILTER_FIELDS: FilterField[] = [
   {label: 'Description', value: 'description', type: 'string'},
   {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
   {label: 'MCC', value: 'mcc', type: 'number'},
+  {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
 ];
 
 const COMBINATORS = [
@@ -70,6 +72,8 @@ const COMBINATORS = [
   {label: 'OR NOT', value: 'OR NOT'},
   {label: 'OR', value: 'OR'},
 ];
+
+const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -165,7 +169,56 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   remove_filter_exception(groupIndex: number) {
+
     this.exceptions.removeAt(groupIndex);
+  }
+
+  private save_exceptions_to_storage(): void {
+    const data = this.build_exceptions();
+    localStorage.setItem(EXCEPTIONS_STORAGE_KEY, JSON.stringify(data));
+  }
+
+  private restore_exceptions_from_storage(): boolean {
+    try {
+      const raw = localStorage.getItem(EXCEPTIONS_STORAGE_KEY);
+      if (!raw) return false;
+      const parsed: FilterException[] = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return false;
+
+      for (const ex of parsed) {
+        const conditions = ex.conditions
+          .map(c => {
+            const field = FILTER_FIELDS.find(f => f.value === c.field) ?? null;
+            const operatorList = field?.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
+            const operator = operatorList.find(o => o.value === c.operator) ?? null;
+            return this.new_condition_group(field, operator, c.value);
+          });
+        const group = this.fb.group({
+          combinator: [ex.combinator ?? 'AND NOT'],
+          conditions: this.fb.array(conditions),
+        });
+        this.exceptions.push(group);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private seed_default_exceptions(): void {
+    const mccField = FILTER_FIELDS.find(f => f.value === 'mcc')!;
+    const descField = FILTER_FIELDS.find(f => f.value === 'description')!;
+    const eqNum = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
+    const eqStr = STRING_OPERATORS.find(o => o.value === 'eq')!;
+
+    this.add_default_exception([
+      {field: mccField, operator: eqNum, value: '4829'},
+      {field: descField, operator: eqStr, value: 'Переказ на картку'},
+    ]);
+    this.add_default_exception([
+      {field: mccField, operator: eqNum, value: '4829'},
+      {field: descField, operator: eqStr, value: 'З Білої картки'},
+    ]);
   }
 
   add_condition(groupIndex: number) {
@@ -189,19 +242,10 @@ export class BankTransactionsComponent implements OnInit {
       {name: 'Option 3', chart_idx: 3}
     ];
 
-    const mccField = FILTER_FIELDS.find(f => f.value === 'mcc')!;
-    const descField = FILTER_FIELDS.find(f => f.value === 'description')!;
-    const eqNum = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
-    const eqStr = STRING_OPERATORS.find(o => o.value === 'eq')!;
-
-    this.add_default_exception([
-      {field: mccField, operator: eqNum, value: '4829'},
-      {field: descField, operator: eqStr, value: 'Переказ на картку'},
-    ]);
-    this.add_default_exception([
-      {field: mccField, operator: eqNum, value: '4829'},
-      {field: descField, operator: eqStr, value: 'З Білої картки'},
-    ]);
+    const restored = this.restore_exceptions_from_storage();
+    if (!restored) {
+      this.seed_default_exceptions();
+    }
 
     effect(() => {
       const state = this.themeState();
@@ -311,8 +355,11 @@ export class BankTransactionsComponent implements OnInit {
         let amount_key = 'amount_' + t.external_id;
         return {
           time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
+          time_string: this.to_uk_date(t.transaction_time),
           external_id: t.external_id,
           size_key: Math.abs(t.amount),
+          description: t.description,
+          masked_pan: t.masked_pan,
           [amount_key]: t.amount / 100,
         };
       });
@@ -324,17 +371,25 @@ export class BankTransactionsComponent implements OnInit {
       sizeKey: "size_key",
       xKey: "time",
       yKey: "amount_" + external_id,
-      yName: external_id,
+      yName: items?.[0]?.masked_pan ?? external_id,
       size: 10, //defaults to 7
       maxSize: 30, //defaults to 30
+      styler: ({datum}: { datum: any }) => {
+
+      },
       tooltip: {
-        renderer: ({datum}: { datum: any }) => ({
-          title: external_id,
-          content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
-        }),
+        renderer: ({datum}: { datum: any }) => {
+          return {
+            title: datum.masked_pan,
+            heading: datum.description,
+            data: [
+              {label: "Amount", value: datum["amount_" + external_id]},
+              {label: "Time", value: datum["time_string"]}
+            ],
+          } as AgTooltipRendererResult;
+        },
       },
     }));
-
 
     let options = {
       theme: "ag-default",
@@ -544,6 +599,7 @@ export class BankTransactionsComponent implements OnInit {
   apply_exceptions() {
     const last = this.t_service.last_transactions_filter;
     if (!last) return;
+    this.save_exceptions_to_storage();
     const filter: BankTransactionFilter = {
       ...last,
       exceptions: this.build_exceptions(),
