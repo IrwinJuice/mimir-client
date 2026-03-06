@@ -11,7 +11,7 @@ import {
   FilterException,
   TransactionService
 } from '../../service/transaction.service';
-import {AccountService} from '../../service/account.service';
+import {AccountService, get_css_var,} from '../../service/account.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
@@ -26,7 +26,7 @@ import {Select} from 'primeng/select';
 import {InputText} from 'primeng/inputtext';
 import {Fieldset} from 'primeng/fieldset';
 import {Tooltip} from 'primeng/tooltip';
-import {AgBubbleSeriesStylerParams, AgBubbleSeriesStylerResult, AgTooltipRendererResult} from 'ag-charts-enterprise';
+import {AgTooltipRendererResult} from 'ag-charts-enterprise';
 
 export type FilterFieldType = 'number' | 'string';
 
@@ -136,7 +136,7 @@ export class BankTransactionsComponent implements OnInit {
   constructor() {
     this.chart_options = [
       {name: 'Загальна', chart_idx: 1},
-      {name: 'Option 2', chart_idx: 2},
+      {name: 'Доходи та витрати', chart_idx: 2},
       {name: 'Option 3', chart_idx: 3}
     ];
 
@@ -146,13 +146,9 @@ export class BankTransactionsComponent implements OnInit {
     }
 
     effect(() => {
-      const _state = this.theme_state(); // track signal
       if (this.transactions.length > 0) {
-        this.on_chart_select(this.chart_idx);
-      } else {
-        const options = {...this.options};
-        options.theme = _state.darkTheme ? 'ag-default-dark' : 'ag-default';
-        this.options = options;
+        const _state = this.theme_state(); // track signal
+        this.on_chart_select(this.chart_idx, this.transactions);
       }
     });
   }
@@ -172,11 +168,27 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   on_field_change(groupIndex: number, condIndex: number) {
-    this.get_conditions(groupIndex).at(condIndex).patchValue({operator: null, value: ''});
+    const cond = this.get_conditions(groupIndex).at(condIndex);
+    const hasField = !!cond.get('field')?.value;
+    const operatorCtrl = cond.get('operator')!;
+    const valueCtrl = cond.get('value')!;
+    if (hasField) {
+      operatorCtrl.enable();
+      valueCtrl.enable();
+    } else {
+      operatorCtrl.disable();
+      valueCtrl.disable();
+    }
+    cond.patchValue({operator: null, value: ''});
   }
 
   private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value: string = '') {
-    return this.fb.group({field: [field], operator: [operator], value: [value]});
+    const hasField = !!field;
+    return this.fb.group({
+      field: [field],
+      operator: [{value: operator, disabled: !hasField}],
+      value: [{value: value, disabled: !hasField}],
+    });
   }
 
   add_filter_exception() {
@@ -289,7 +301,6 @@ export class BankTransactionsComponent implements OnInit {
         const filter: BankTransactionFilter = {
           external_id_list: [],
           ida_list: [],
-          // mcc_list: [],
           idu: this.user.idu,
           from,
           to,
@@ -299,7 +310,7 @@ export class BankTransactionsComponent implements OnInit {
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        this.on_chart_select(this.chart_idx, t_list);
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -328,7 +339,7 @@ export class BankTransactionsComponent implements OnInit {
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        this.on_chart_select(this.chart_idx, t_list);
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -342,7 +353,7 @@ export class BankTransactionsComponent implements OnInit {
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        this.on_chart_select(this.chart_idx, t_list);
       }),
     ).subscribe();
 
@@ -353,35 +364,35 @@ export class BankTransactionsComponent implements OnInit {
   }
 
 
-  on_chart_select(idx: number) {
+  on_chart_select(idx: number, t_list: BankTransaction[]) {
     switch (idx) {
       case 1:
-        this.draw_main_chart()
+        this.draw_main_chart(t_list)
         break;
       case 2:
-        this.draw_income_outcome()
+        this.draw_income_outcome(t_list)
         break;
     }
 
   }
 
-  draw_main_chart() {
+  draw_main_chart(t_list: BankTransaction[]) {
 
-    let data = [...this.transactions]
-      .map(t => {
-        let amount_key = 'amount_' + t.external_id;
-        return {
-          time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
-          time_string: this.to_uk_date(t.transaction_time),
-          external_id: t.external_id,
-          size_key: Math.abs(t.amount),
-          description: t.description,
-          masked_pan: t.masked_pan,
-          [amount_key]: t.amount / 100,
-        };
-      });
+    let data = t_list.map(t => {
+      let amount_key = 'amount_' + t.external_id;
+      return {
+        time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
+        time_string: this.to_uk_date(t.transaction_time),
+        external_id: t.external_id,
+        size_key: Math.abs(t.amount),
+        description: t.description,
+        masked_pan: t.masked_pan,
+        [amount_key]: t.amount / 100,
+      };
+    });
 
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
+    console.log('groups', groups)
 
     const series = groups.map(([external_id, items]) => {
       const color = this.account_service.get_color(external_id);
@@ -393,7 +404,7 @@ export class BankTransactionsComponent implements OnInit {
         yName: items?.[0]?.masked_pan ?? external_id,
         size: 10,
         maxSize: 30,
-        styler: ({datum}: {datum: any}) => ({
+        styler: ({datum}: { datum: any }) => ({
           fill: color,
           stroke: color,
         }),
@@ -420,20 +431,20 @@ export class BankTransactionsComponent implements OnInit {
       zoom: {enabled: true, minVisibleItems: 1},
       navigator: {enabled: true, miniChart: {enabled: true}},
       tooltip: {enabled: true},
-      axes: [
-        {
+      axes: {
+        x: {
           type: "time",
           position: "bottom",
-          label: {format: "%d.%m %H:%M", autoRotate: true},
+          label: {format: "%d.%m.%y", autoRotate: true},
         },
-        {
+        y: {
           type: "number",
           position: "left",
           label: {
             formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
           },
         },
-      ],
+      },
       data,
       series,
     };
@@ -447,10 +458,10 @@ export class BankTransactionsComponent implements OnInit {
   }
 
 
-  draw_income_outcome() {
+  draw_income_outcome(t_list: BankTransaction[]) {
     // Group transactions by "YYYY-MM" month key
     const groups = Object.groupBy(
-      this.transactions,
+      t_list,
       (t) => DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toFormat('yyyy-MM')
     );
 
@@ -475,8 +486,8 @@ export class BankTransactionsComponent implements OnInit {
     console.log(data)
 
     const isDark = this.theme_state().darkTheme;
-    const outcomeColor = isDark ? '#f38ba8' : '#d20f39'; // Red
-    const incomeColor = isDark ? '#a6e3a1' : '#40a02b';  // Green
+    const outcomeColor = get_css_var('--p-red-500');
+    const incomeColor = get_css_var('--p-green-500');
 
     const options: any = {
       theme: isDark ? 'ag-default-dark' : 'ag-default',
@@ -512,10 +523,10 @@ export class BankTransactionsComponent implements OnInit {
           },
         },
       ],
-      axes: [
-        {type: 'category', position: 'bottom', label: {autoRotate: true}},
-        {type: 'number', position: 'left'},
-      ],
+      axes: {
+        x: {type: 'category', position: 'bottom', label: {autoRotate: true}},
+        y: {type: 'number', position: 'left'},
+      },
     };
 
     this.options = options;
@@ -614,11 +625,12 @@ export class BankTransactionsComponent implements OnInit {
       .map(group => {
         const conditions = (group.get('conditions') as FormArray).controls;
         const built: FilterCondition[] = conditions
-          .filter(c => c.get('field')?.value && c.get('operator')?.value && c.get('value')?.value !== '')
-          .map(c => ({
-            field: (c.get('field')!.value as FilterField).value,
-            operator: (c.get('operator')!.value as FilterOperator).value,
-            value: String(c.get('value')!.value),
+          .map(c => (c as FormGroup).getRawValue())
+          .filter(raw => raw.field && raw.operator && raw.value !== '')
+          .map(raw => ({
+            field: (raw.field as FilterField).value,
+            operator: (raw.operator as FilterOperator).value,
+            value: String(raw.value),
           }));
         return {combinator: group.get('combinator')!.value as string, conditions: built} as FilterException;
       })
@@ -635,8 +647,8 @@ export class BankTransactionsComponent implements OnInit {
     };
     this.t_service.get_transactions(filter).pipe(
       tap((t_list) => {
-        this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        // this.transactions = t_list || [];
+        this.on_chart_select(this.chart_idx, t_list);
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();

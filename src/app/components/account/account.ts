@@ -142,9 +142,7 @@ export class Account implements OnInit {
             let monitor = account.children.find((node) => node.data.external_id === notification.external_id);
             return this.account_service.get_account_monitor(this.user.idu, monitor.data.external_id).pipe(
               tap((m) => {
-                console.log('m', m)
                 monitor.data = {
-                  // include ida and external_id for reliable future lookups
                   ida: m.ida,
                   external_id: m.external_id,
                   kind: m.masked_pan,

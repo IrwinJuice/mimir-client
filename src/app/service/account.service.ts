@@ -4,7 +4,9 @@ import {HttpClient} from '@angular/common/http';
 import {environment} from '../../environments/environment';
 import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
-import {ThemeService} from './theme.service';
+
+import { palette } from '@primeuix/themes';
+
 
 export type CreateAccount = {
   idu: number,
@@ -29,36 +31,31 @@ export enum AccountMonitorStatus {
   UPDATED = 'Updated',
 }
 
-export enum ChartColorsLatte {
-  Lavender = '#7287fd',
-  Peach = '#fe640b',
-  Maroon = '#e64553',
-  Mauve = '#8839ef',
-  Teal = '#179299',
-  Yellow = '#df8e1d',
-  Pink = '#ea76cb',
-  Green = '#40a02b',
-  Red = '#d20f39',
-  Flamingo = '#dd7878',
-  Sky = '#04a5e5',
-  Sapphire = '#209fb5',
-  Blue = '#1e66f5',
-}
+/**
+ * PrimeNG CSS variable names used as chart colors.
+ * Each entry maps to a --p-{color}-{shade} custom property on :root.
+ * get_css_var() resolves the current computed value at runtime,
+ * so colors automatically follow the active PrimeNG theme, primary and surface.
+ */
+export const CHART_COLOR_VARS = [
+  '--p-blue-500',
+  '--p-green-500',
+  '--p-orange-500',
+  '--p-purple-500',
+  '--p-teal-500',
+  '--p-yellow-500',
+  '--p-pink-500',
+  '--p-cyan-500',
+  '--p-red-500',
+  '--p-indigo-500',
+  '--p-sky-500',
+  '--p-violet-500',
+  '--p-emerald-500',
+] as const;
 
-export enum ChartColorsMocha {
-  Lavender = '#7287fd',
-  Flamingo = '#f2cdcd',
-  Green = '#a6e3a1',
-  Mauve = '#cba6f7',
-  Pink = '#f5c2e7',
-  Red = '#f38ba8',
-  Maroon = '#eba0ac',
-  Peach = '#fab387',
-  Yellow = '#f9e2af',
-  Teal = '#94e2d5',
-  Sky = '#89dceb',
-  Sapphire = '#74c7ec',
-  Blue = '#89b4fa',
+/** Read a PrimeNG CSS variable from the document root and return its resolved value. */
+export function get_css_var(varName: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
 }
 
 export type AccountMonitor = {
@@ -81,7 +78,6 @@ export type AccountMonitor = {
 
 export class AccountService {
 
-  private theme_service = inject(ThemeService);
   private message = inject(MessageService);
   private http = inject(HttpClient);
 
@@ -91,17 +87,17 @@ export class AccountService {
   private _monitor_status = new Subject<WebSocketNotification>();
   monitor_status$ = this._monitor_status.asObservable();
 
-  // account_monitor - color
-  color_map: Map<String, String> = new Map();
-  color_array = ['Lavender', 'Peach', 'Maroon', 'Mauve', 'Teal', 'Yellow', 'Pink', 'Green', 'Red', 'Flamingo', 'Sky', 'Sapphire', 'Blue',];
+  // account_monitor → CSS variable name (e.g. '--p-blue-500')
+  color_map: Map<string, string> = new Map();
+  color_array = [...CHART_COLOR_VARS];
 
+  /** Returns the live resolved color for a given external_id.
+   *  Reads the CSS variable from the DOM, so it always reflects
+   *  the current PrimeNG theme (preset, primary, surface, dark/light). */
   get_color(external_id: string): string {
-    const colorName = this.color_map.get(external_id) as keyof typeof ChartColorsLatte;
-    if (!colorName) return '#888888';
-    const isDark = this.theme_service.theme_state().darkTheme;
-    return isDark
-      ? ChartColorsMocha[colorName as keyof typeof ChartColorsMocha]
-      : ChartColorsLatte[colorName as keyof typeof ChartColorsLatte];
+    const cssVar = this.color_map.get(external_id);
+    if (!cssVar) return get_css_var('--p-surface-400') || '#888888';
+    return get_css_var(cssVar);
   }
 
 
