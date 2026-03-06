@@ -5,7 +5,56 @@ import {environment} from '../../environments/environment';
 import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
 
-import { palette } from '@primeuix/themes';
+
+export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+
+export const FILTER_FIELDS: FilterField[] = [
+  {label: 'Amount', value: 'amount', type: 'number'},
+  {label: 'Currency', value: 'currency', type: 'string'},
+  {label: 'Description', value: 'description', type: 'string'},
+  {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
+  {label: 'MCC', value: 'mcc', type: 'number'},
+  {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
+]
+
+export const STRING_OPERATORS: FilterOperator[] = [
+  {label: 'Дорівнює', value: 'eq'},
+  {label: 'Не дорівнює', value: 'neq'},
+  {label: 'Починається з', value: 'startsWith'},
+  {label: 'Закінчується на', value: 'endsWith'},
+  {label: 'Містить', value: 'contains'},
+];
+
+export const NUMBER_OPERATORS: FilterOperator[] = [
+  {label: '=', value: 'eq'},
+  {label: '!=', value: 'neq'},
+  {label: '<', value: 'lt'},
+  {label: '>', value: 'gt'},
+  {label: '≤', value: 'lte'},
+  {label: '≥', value: 'gte'},
+];
+
+
+export const COMBINATORS = [
+  {label: 'AND NOT', value: 'AND NOT'},
+  {label: 'AND', value: 'AND'},
+  {label: 'OR NOT', value: 'OR NOT'},
+  {label: 'OR', value: 'OR'},
+];
+;
+
+export type FilterFieldType = 'number' | 'string';
+
+export interface FilterField {
+  label: string;
+  value: string;
+  type: FilterFieldType;
+}
+
+export interface FilterOperator {
+  label: string;
+  value: string;
+}
 
 
 export type CreateAccount = {
@@ -91,15 +140,6 @@ export class AccountService {
   color_map: Map<string, string> = new Map();
   color_array = [...CHART_COLOR_VARS];
 
-  /** Returns the live resolved color for a given external_id.
-   *  Reads the CSS variable from the DOM, so it always reflects
-   *  the current PrimeNG theme (preset, primary, surface, dark/light). */
-  get_color(external_id: string): string {
-    const cssVar = this.color_map.get(external_id);
-    if (!cssVar) return get_css_var('--p-surface-400') || '#888888';
-    return get_css_var(cssVar);
-  }
-
 
   set accounts(next: Account[]) {
     this._accounts.next(next);
@@ -111,6 +151,15 @@ export class AccountService {
 
   set monitor_status(notification: WebSocketNotification) {
     this._monitor_status.next(notification);
+  }
+
+  /** Returns the live resolved color for a given external_id.
+   *  Reads the CSS variable from the DOM, so it always reflects
+   *  the current PrimeNG theme (preset, primary, surface, dark/light). */
+  get_color(external_id: string): string {
+    const cssVar = this.color_map.get(external_id);
+    if (!cssVar) return get_css_var('--p-surface-500') || '#888888';
+    return get_css_var(cssVar);
   }
 
   add_account(account: CreateAccount) {

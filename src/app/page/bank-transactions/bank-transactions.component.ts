@@ -1,17 +1,23 @@
 import {Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
 import {ChartModule} from 'primeng/chart';
-import {FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
+import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
 import {User, UserService} from '../../service/user.service';
-import {of, skip, switchMap, tap} from 'rxjs';
+import {of, skip, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
   BankTransactionFilter,
-  FilterCondition,
   FilterException,
   TransactionService
 } from '../../service/transaction.service';
-import {AccountService, get_css_var,} from '../../service/account.service';
+import {
+  AccountService,
+  EXCEPTIONS_STORAGE_KEY,
+  FILTER_FIELDS,
+  get_css_var,
+  NUMBER_OPERATORS,
+  STRING_OPERATORS,
+} from '../../service/account.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
@@ -21,60 +27,8 @@ import {ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
-import {Button} from 'primeng/button';
-import {Select} from 'primeng/select';
-import {InputText} from 'primeng/inputtext';
-import {Fieldset} from 'primeng/fieldset';
-import {Tooltip} from 'primeng/tooltip';
 import {AgTooltipRendererResult} from 'ag-charts-enterprise';
-
-export type FilterFieldType = 'number' | 'string';
-
-export interface FilterField {
-  label: string;
-  value: string;
-  type: FilterFieldType;
-}
-
-export interface FilterOperator {
-  label: string;
-  value: string;
-}
-
-const STRING_OPERATORS: FilterOperator[] = [
-  {label: 'Дорівнює', value: 'eq'},
-  {label: 'Не дорівнює', value: 'neq'},
-  {label: 'Починається з', value: 'startsWith'},
-  {label: 'Закінчується на', value: 'endsWith'},
-  {label: 'Містить', value: 'contains'},
-];
-
-const NUMBER_OPERATORS: FilterOperator[] = [
-  {label: '=', value: 'eq'},
-  {label: '!=', value: 'neq'},
-  {label: '<', value: 'lt'},
-  {label: '>', value: 'gt'},
-  {label: '≤', value: 'lte'},
-  {label: '≥', value: 'gte'},
-];
-
-const FILTER_FIELDS: FilterField[] = [
-  {label: 'Amount', value: 'amount', type: 'number'},
-  {label: 'Currency', value: 'currency', type: 'string'},
-  {label: 'Description', value: 'description', type: 'string'},
-  {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
-  {label: 'MCC', value: 'mcc', type: 'number'},
-  {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
-];
-
-const COMBINATORS = [
-  {label: 'AND NOT', value: 'AND NOT'},
-  {label: 'AND', value: 'AND'},
-  {label: 'OR NOT', value: 'OR NOT'},
-  {label: 'OR', value: 'OR'},
-];
-
-const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+import {Filter} from '../../components/filter/filter';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -90,11 +44,7 @@ const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
     TabPanels,
     TableModule,
     SelectButton,
-    Button,
-    Select,
-    InputText,
-    Fieldset,
-    Tooltip,
+    Filter,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -107,7 +57,6 @@ export class BankTransactionsComponent implements OnInit {
   protected t_service = inject(TransactionService);
   private account_service = inject(AccountService);
   private destroyRef = inject(DestroyRef);
-  private fb = inject(FormBuilder);
   private theme_service = inject(ThemeService);
 
 
@@ -123,15 +72,8 @@ export class BankTransactionsComponent implements OnInit {
   chart_options = [];
   chart_idx = 1;
 
-  filter_fields: FilterField[] = FILTER_FIELDS;
-  combinators = COMBINATORS;
+  exceptions: FilterException[] = [];
 
-  // Two-level FormArray:
-  // exceptions_form.exceptions = FormArray of groups
-  // each group = FormGroup { conditions: FormArray of condition rows }
-  exceptions_form: FormGroup = this.fb.group({
-    exceptions: this.fb.array([])
-  });
 
   constructor() {
     this.chart_options = [
@@ -140,140 +82,52 @@ export class BankTransactionsComponent implements OnInit {
       {name: 'Option 3', chart_idx: 3}
     ];
 
-    const restored = this.restore_exceptions_from_storage();
-    if (!restored) {
-      this.seed_default_exceptions();
+    this.exceptions = this.restore_exceptions_from_storage();
+    if (this.exceptions.length < 1) {
+      this.exceptions = this.seed_default_exceptions();
     }
 
     effect(() => {
-      if (this.transactions.length > 0) {
-        const _state = this.theme_state(); // track signal
-        this.on_chart_select(this.chart_idx, this.transactions);
-      }
+      const _state = this.theme_state(); // track signal
+      this.on_chart_select(this.chart_idx, this.transactions);
     });
   }
 
-  get exceptions(): FormArray {
-    return this.exceptions_form.get('exceptions') as FormArray;
-  }
-
-  get_conditions(groupIndex: number): FormArray {
-    return this.exceptions.at(groupIndex).get('conditions') as FormArray;
-  }
-
-  get_operators_for(groupIndex: number, condIndex: number): FilterOperator[] {
-    const field: FilterField | null = this.get_conditions(groupIndex).at(condIndex)?.get('field')?.value;
-    if (!field) return [];
-    return field.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
-  }
-
-  on_field_change(groupIndex: number, condIndex: number) {
-    const cond = this.get_conditions(groupIndex).at(condIndex);
-    const hasField = !!cond.get('field')?.value;
-    const operatorCtrl = cond.get('operator')!;
-    const valueCtrl = cond.get('value')!;
-    if (hasField) {
-      operatorCtrl.enable();
-      valueCtrl.enable();
-    } else {
-      operatorCtrl.disable();
-      valueCtrl.disable();
-    }
-    cond.patchValue({operator: null, value: ''});
-  }
-
-  private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value: string = '') {
-    const hasField = !!field;
-    return this.fb.group({
-      field: [field],
-      operator: [{value: operator, disabled: !hasField}],
-      value: [{value: value, disabled: !hasField}],
-    });
-  }
-
-  add_filter_exception() {
-    const group = this.fb.group({
-      combinator: ['AND NOT'],
-      conditions: this.fb.array([this.new_condition_group()])
-    });
-    this.exceptions.push(group);
-  }
-
-  private add_default_exception(conditions: { field: FilterField, operator: FilterOperator, value: string }[]) {
-    const group = this.fb.group({
-      combinator: ['AND NOT'],
-      conditions: this.fb.array(conditions.map(c => this.new_condition_group(c.field, c.operator, c.value)))
-    });
-    this.exceptions.push(group);
-  }
-
-  remove_filter_exception(groupIndex: number) {
-
-    this.exceptions.removeAt(groupIndex);
-  }
-
-  private save_exceptions_to_storage(): void {
-    const data = this.build_exceptions();
-    localStorage.setItem(EXCEPTIONS_STORAGE_KEY, JSON.stringify(data));
-  }
-
-  private restore_exceptions_from_storage(): boolean {
+  private restore_exceptions_from_storage(): FilterException[] {
     try {
       const raw = localStorage.getItem(EXCEPTIONS_STORAGE_KEY);
-      if (!raw) return false;
+      if (!raw) return [];
       const parsed: FilterException[] = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return false;
-
-      for (const ex of parsed) {
-        const conditions = ex.conditions
-          .map(c => {
-            const field = FILTER_FIELDS.find(f => f.value === c.field) ?? null;
-            const operatorList = field?.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
-            const operator = operatorList.find(o => o.value === c.operator) ?? null;
-            return this.new_condition_group(field, operator, c.value);
-          });
-        const group = this.fb.group({
-          combinator: [ex.combinator ?? 'AND NOT'],
-          conditions: this.fb.array(conditions),
-        });
-        this.exceptions.push(group);
-      }
-      return true;
+      if (!Array.isArray(parsed) || parsed.length === 0) return [];
+      return parsed;
     } catch {
-      return false;
+      return [];
     }
   }
 
-  private seed_default_exceptions(): void {
+  private seed_default_exceptions(): FilterException[] {
     const mccField = FILTER_FIELDS.find(f => f.value === 'mcc')!;
     const descField = FILTER_FIELDS.find(f => f.value === 'description')!;
     const eqNum = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
     const eqStr = STRING_OPERATORS.find(o => o.value === 'eq')!;
-
-    this.add_default_exception([
-      {field: mccField, operator: eqNum, value: '4829'},
-      {field: descField, operator: eqStr, value: 'Переказ на картку'},
-    ]);
-    this.add_default_exception([
-      {field: mccField, operator: eqNum, value: '4829'},
-      {field: descField, operator: eqStr, value: 'З Білої картки'},
-    ]);
-  }
-
-  add_condition(groupIndex: number) {
-    this.get_conditions(groupIndex).push(this.new_condition_group());
-  }
-
-  remove_condition(groupIndex: number, condIndex: number) {
-    const conditions = this.get_conditions(groupIndex);
-    if (conditions.length === 1) {
-      // removing last condition removes the whole group
-      this.exceptions.removeAt(groupIndex);
-    } else {
-      conditions.removeAt(condIndex);
+    const f: FilterException = {
+      combinator: 'AND NOT',
+      conditions: [
+        {field: mccField.value, operator: eqNum.value, value: '4829'},
+        {field: descField.value, operator: eqStr.value, value: 'Переказ на картку'},
+      ]
     }
-  }
 
+    const s: FilterException = {
+      combinator: 'AND NOT',
+      conditions: [
+        {field: mccField.value, operator: eqNum.value, value: '4829'},
+        {field: descField.value, operator: eqStr.value, value: 'З Білої картки'},
+      ]
+    }
+
+    return [f, s];
+  }
 
   ngOnInit() {
 
@@ -298,13 +152,14 @@ export class BankTransactionsComponent implements OnInit {
         // Convert to Unix timestamps (seconds since epoch)
         const to = Math.floor(toDate.getTime() / 1000);
         const from = Math.floor(fromDate.getTime() / 1000);
+        console.log('this.exceptions', this.exceptions)
         const filter: BankTransactionFilter = {
           external_id_list: [],
           ida_list: [],
           idu: this.user.idu,
           from,
           to,
-          exceptions: this.build_exceptions(),
+          exceptions: this.exceptions,
         }
         return this.t_service.get_transactions(filter)
       }),
@@ -332,7 +187,7 @@ export class BankTransactionsComponent implements OnInit {
           ...this.t_service.last_transactions_filter,
           from,
           to,
-          exceptions: this.build_exceptions(),
+          exceptions: this.exceptions,
         };
         this.t_service.last_transactions_filter = filter;
         return this.t_service.get_transactions(filter)
@@ -377,7 +232,6 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   draw_main_chart(t_list: BankTransaction[]) {
-
     let data = t_list.map(t => {
       let amount_key = 'amount_' + t.external_id;
       return {
@@ -392,7 +246,6 @@ export class BankTransactionsComponent implements OnInit {
     });
 
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
-    console.log('groups', groups)
 
     const series = groups.map(([external_id, items]) => {
       const color = this.account_service.get_color(external_id);
@@ -404,10 +257,12 @@ export class BankTransactionsComponent implements OnInit {
         yName: items?.[0]?.masked_pan ?? external_id,
         size: 10,
         maxSize: 30,
-        styler: ({datum}: { datum: any }) => ({
-          fill: color,
-          stroke: color,
-        }),
+        fill: color,
+        stroke: color,
+        // styler: ({datum}: { datum: any }) => ({
+        //   fill: color,
+        //   stroke: color,
+        // }),
         tooltip: {
           renderer: ({datum}: { datum: any }) => {
             return {
@@ -482,8 +337,6 @@ export class BankTransactionsComponent implements OnInit {
         };
       })
       .sort((a, b) => a.month.localeCompare(b.month));
-
-    console.log(data)
 
     const isDark = this.theme_state().darkTheme;
     const outcomeColor = get_css_var('--p-red-500');
@@ -620,37 +473,21 @@ export class BankTransactionsComponent implements OnInit {
 
   // }
 
-  private build_exceptions(): FilterException[] {
-    return this.exceptions.controls
-      .map(group => {
-        const conditions = (group.get('conditions') as FormArray).controls;
-        const built: FilterCondition[] = conditions
-          .map(c => (c as FormGroup).getRawValue())
-          .filter(raw => raw.field && raw.operator && raw.value !== '')
-          .map(raw => ({
-            field: (raw.field as FilterField).value,
-            operator: (raw.operator as FilterOperator).value,
-            value: String(raw.value),
-          }));
-        return {combinator: group.get('combinator')!.value as string, conditions: built} as FilterException;
-      })
-      .filter(ex => ex.conditions.length > 0);
-  }
-
-  apply_exceptions() {
+  apply_filter_changes() {
     const last = this.t_service.last_transactions_filter;
+    console.log('last', last)
     if (!last) return;
-    this.save_exceptions_to_storage();
+
     const filter: BankTransactionFilter = {
       ...last,
-      exceptions: this.build_exceptions(),
+      exceptions: this.exceptions,
     };
     this.t_service.get_transactions(filter).pipe(
+      take(1),
       tap((t_list) => {
-        // this.transactions = t_list || [];
+        this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
       }),
-      takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }
 }

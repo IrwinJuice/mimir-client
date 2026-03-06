@@ -4,7 +4,7 @@ import {Button} from 'primeng/button';
 import {Dialog} from 'primeng/dialog';
 import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
-import {AsyncPipe} from '@angular/common';
+import {AsyncPipe, JsonPipe} from '@angular/common';
 import {
   Account as BankAccount,
   AccountKind,
@@ -40,7 +40,8 @@ interface Column {
     AsyncPipe,
     FormsModule,
     TreeTableModule,
-    ProgressBar
+    ProgressBar,
+    JsonPipe
   ],
   templateUrl: './account.html',
   styleUrl: './account.scss',
