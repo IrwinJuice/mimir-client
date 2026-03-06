@@ -22,6 +22,7 @@ import * as cc from 'currency-codes';
 import {ProgressBar} from 'primeng/progressbar';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
+import {ThemeService} from '../../service/theme.service';
 
 interface Column {
   field: string;
@@ -55,6 +56,7 @@ export class Account implements OnInit {
 
   private formBuilder = inject(FormBuilder);
   protected account_service = inject(AccountService);
+  protected theme_service = inject(ThemeService);
   private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);

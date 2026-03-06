@@ -14,7 +14,6 @@ import {
   AccountService,
   EXCEPTIONS_STORAGE_KEY,
   FILTER_FIELDS,
-  get_css_var,
   NUMBER_OPERATORS,
   STRING_OPERATORS,
 } from '../../service/account.service';
@@ -23,7 +22,7 @@ import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
 import {AgCharts} from 'ag-charts-angular';
 import {DateTime} from 'luxon';
-import {ThemeService} from '../../service/theme.service';
+import {get_css_var, ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
@@ -64,7 +63,7 @@ export class BankTransactionsComponent implements OnInit {
   transactions: BankTransaction[] = [];
 
   data: any = {labels: [], datasets: []};
-  options: any;
+  options: any = this.create_default_chart_options();
 
   user: User;
 
@@ -88,9 +87,22 @@ export class BankTransactionsComponent implements OnInit {
     }
 
     effect(() => {
-      const _state = this.theme_state(); // track signal
+      this.theme_state();
       this.on_chart_select(this.chart_idx, this.transactions);
     });
+  }
+
+  /**
+   * Creates a minimal chart configuration used before transaction data is loaded.
+   * This keeps the chart binding stable and aligns the theme with the current app theme.
+   */
+  private create_default_chart_options() {
+    return {
+      theme: this.theme_service.theme_state().darkTheme ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data: [],
+      series: [],
+    };
   }
 
   private restore_exceptions_from_storage(): FilterException[] {
@@ -152,7 +164,6 @@ export class BankTransactionsComponent implements OnInit {
         // Convert to Unix timestamps (seconds since epoch)
         const to = Math.floor(toDate.getTime() / 1000);
         const from = Math.floor(fromDate.getTime() / 1000);
-        console.log('this.exceptions', this.exceptions)
         const filter: BankTransactionFilter = {
           external_id_list: [],
           ida_list: [],
@@ -164,6 +175,7 @@ export class BankTransactionsComponent implements OnInit {
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
+        console.log('t_list', t_list)
         this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
       }),
@@ -247,8 +259,18 @@ export class BankTransactionsComponent implements OnInit {
 
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
 
+    let count = 0;
     const series = groups.map(([external_id, items]) => {
-      const color = this.account_service.get_color(external_id);
+
+      // fill color map
+      if (!this.theme_service.color_map.has(external_id)) {
+        if (count >= this.theme_service.color_array.length) {
+          count = 0;
+        }
+        this.theme_service.color_map.set(external_id, this.theme_service.color_array[count]);
+        count++;
+      }
+      const color = this.theme_service.get_color(external_id);
       return {
         type: "bubble",
         sizeKey: "size_key",
@@ -342,10 +364,11 @@ export class BankTransactionsComponent implements OnInit {
     const outcomeColor = get_css_var('--p-red-500');
     const incomeColor = get_css_var('--p-green-500');
 
-    const options: any = {
+    const options = {
       theme: isDark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
+
       series: [
         {
           type: 'line',

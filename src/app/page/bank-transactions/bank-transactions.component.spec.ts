@@ -20,4 +20,10 @@ describe('Bills', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should initialize default chart options', () => {
+    expect(component.options).toBeTruthy();
+    expect(component.options.data).toEqual([]);
+    expect(component.options.series).toEqual([]);
+  });
 });
