@@ -120,7 +120,7 @@ export class ThemeSwitcher {
 
   config: PrimeNG = inject(PrimeNG);
   theme_service = inject(ThemeService);
-  themeState = this.theme_service.themeState;
+  themeState = this.theme_service.theme_state;
 
   theme = computed(() => (this.themeState()?.darkTheme ? 'dark' : 'light'));
 

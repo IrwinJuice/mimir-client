@@ -53,7 +53,7 @@ export class Account implements OnInit {
   loading = false;
 
   private formBuilder = inject(FormBuilder);
-  private account_service = inject(AccountService);
+  protected account_service = inject(AccountService);
   private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);
@@ -104,8 +104,6 @@ export class Account implements OnInit {
       }),
       tap((monitors) => {
         this.monitors = monitors || [];
-        console.log(monitors)
-
         this.monitors.forEach((m) => {
           const parent = this.accountsTree.find(n => n.key === `account-${m.ida}`);
           if (parent) {

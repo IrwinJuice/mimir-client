@@ -4,6 +4,7 @@ import {HttpClient} from '@angular/common/http';
 import {environment} from '../../environments/environment';
 import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
+import {ThemeService} from './theme.service';
 
 export type CreateAccount = {
   idu: number,
@@ -30,15 +31,15 @@ export enum AccountMonitorStatus {
 
 export enum ChartColorsLatte {
   Lavender = '#7287fd',
-  Flamingo = '#dd7878',
-  Pink = '#ea76cb',
-  Mauve = '#8839ef',
-  Red = '#d20f39',
-  Maroon = '#e64553',
   Peach = '#fe640b',
-  Yellow = '#df8e1d',
-  Green = '#40a02b',
+  Maroon = '#e64553',
+  Mauve = '#8839ef',
   Teal = '#179299',
+  Yellow = '#df8e1d',
+  Pink = '#ea76cb',
+  Green = '#40a02b',
+  Red = '#d20f39',
+  Flamingo = '#dd7878',
   Sky = '#04a5e5',
   Sapphire = '#209fb5',
   Blue = '#1e66f5',
@@ -80,6 +81,7 @@ export type AccountMonitor = {
 
 export class AccountService {
 
+  private theme_service = inject(ThemeService);
   private message = inject(MessageService);
   private http = inject(HttpClient);
 
@@ -91,7 +93,17 @@ export class AccountService {
 
   // account_monitor - color
   color_map: Map<String, String> = new Map();
-  color_array = ['Lavender', 'Flamingo', 'Green', 'Mauve', 'Red', 'Maroon', 'Peach', 'Yellow', 'Teal', 'Sky', 'Sapphire', 'Blue', 'Pink',];
+  color_array = ['Lavender', 'Peach', 'Maroon', 'Mauve', 'Teal', 'Yellow', 'Pink', 'Green', 'Red', 'Flamingo', 'Sky', 'Sapphire', 'Blue',];
+
+  get_color(external_id: string): string {
+    const colorName = this.color_map.get(external_id) as keyof typeof ChartColorsLatte;
+    if (!colorName) return '#888888';
+    const isDark = this.theme_service.theme_state().darkTheme;
+    return isDark
+      ? ChartColorsMocha[colorName as keyof typeof ChartColorsMocha]
+      : ChartColorsLatte[colorName as keyof typeof ChartColorsLatte];
+  }
+
 
   set accounts(next: Account[]) {
     this._accounts.next(next);
@@ -150,6 +162,7 @@ export class AccountService {
               count = 0;
             }
             this.color_map.set(m.external_id, this.color_array[count]);
+            count++;
           }
         }
       }),

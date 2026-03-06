@@ -11,6 +11,7 @@ import {
   FilterException,
   TransactionService
 } from '../../service/transaction.service';
+import {AccountService} from '../../service/account.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
@@ -104,8 +105,11 @@ export class BankTransactionsComponent implements OnInit {
   private dt_service = inject(DateTimeService);
   protected user_service = inject(UserService);
   protected t_service = inject(TransactionService);
+  private account_service = inject(AccountService);
   private destroyRef = inject(DestroyRef);
   private fb = inject(FormBuilder);
+  private theme_service = inject(ThemeService);
+
 
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
@@ -115,8 +119,7 @@ export class BankTransactionsComponent implements OnInit {
 
   user: User;
 
-  theme_service = inject(ThemeService);
-  themeState = this.theme_service.themeState;
+  theme_state = this.theme_service.theme_state;
   chart_options = [];
   chart_idx = 1;
 
@@ -129,6 +132,30 @@ export class BankTransactionsComponent implements OnInit {
   exceptions_form: FormGroup = this.fb.group({
     exceptions: this.fb.array([])
   });
+
+  constructor() {
+    this.chart_options = [
+      {name: 'Загальна', chart_idx: 1},
+      {name: 'Option 2', chart_idx: 2},
+      {name: 'Option 3', chart_idx: 3}
+    ];
+
+    const restored = this.restore_exceptions_from_storage();
+    if (!restored) {
+      this.seed_default_exceptions();
+    }
+
+    effect(() => {
+      const _state = this.theme_state(); // track signal
+      if (this.transactions.length > 0) {
+        this.on_chart_select(this.chart_idx);
+      } else {
+        const options = {...this.options};
+        options.theme = _state.darkTheme ? 'ag-default-dark' : 'ag-default';
+        this.options = options;
+      }
+    });
+  }
 
   get exceptions(): FormArray {
     return this.exceptions_form.get('exceptions') as FormArray;
@@ -235,29 +262,6 @@ export class BankTransactionsComponent implements OnInit {
     }
   }
 
-  constructor() {
-    this.chart_options = [
-      {name: 'Загальна', chart_idx: 1},
-      {name: 'Option 2', chart_idx: 2},
-      {name: 'Option 3', chart_idx: 3}
-    ];
-
-    const restored = this.restore_exceptions_from_storage();
-    if (!restored) {
-      this.seed_default_exceptions();
-    }
-
-    effect(() => {
-      const state = this.themeState();
-      const options = {...this.options};
-      if (state.darkTheme) {
-        options.theme = "ag-default-dark";
-      } else {
-        options.theme = "ag-default";
-      }
-      this.options = options;
-    });
-  }
 
   ngOnInit() {
 
@@ -379,30 +383,34 @@ export class BankTransactionsComponent implements OnInit {
 
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
 
-    const series = groups.map(([external_id, items]) => ({
-      type: "bubble",
-      sizeKey: "size_key",
-      xKey: "time",
-      yKey: "amount_" + external_id,
-      yName: items?.[0]?.masked_pan ?? external_id,
-      size: 10, //defaults to 7
-      maxSize: 30, //defaults to 30
-      styler: ({datum}: { datum: any }) => {
-
-      },
-      tooltip: {
-        renderer: ({datum}: { datum: any }) => {
-          return {
-            title: datum.masked_pan,
-            heading: datum.description,
-            data: [
-              {label: "Amount", value: datum["amount_" + external_id]},
-              {label: "Time", value: datum["time_string"]}
-            ],
-          } as AgTooltipRendererResult;
+    const series = groups.map(([external_id, items]) => {
+      const color = this.account_service.get_color(external_id);
+      return {
+        type: "bubble",
+        sizeKey: "size_key",
+        xKey: "time",
+        yKey: "amount_" + external_id,
+        yName: items?.[0]?.masked_pan ?? external_id,
+        size: 10,
+        maxSize: 30,
+        styler: ({datum}: {datum: any}) => ({
+          fill: color,
+          stroke: color,
+        }),
+        tooltip: {
+          renderer: ({datum}: { datum: any }) => {
+            return {
+              title: datum.masked_pan,
+              heading: datum.description,
+              data: [
+                {label: "Amount", value: datum["amount_" + external_id]},
+                {label: "Time", value: datum["time_string"]}
+              ],
+            } as AgTooltipRendererResult;
+          },
         },
-      },
-    }));
+      };
+    });
 
     let options = {
       theme: "ag-default",
@@ -431,7 +439,7 @@ export class BankTransactionsComponent implements OnInit {
     };
 
 
-    const state = this.themeState();
+    const state = this.theme_state();
     if (state.darkTheme) {
       options.theme = "ag-default-dark";
     }
@@ -466,8 +474,12 @@ export class BankTransactionsComponent implements OnInit {
 
     console.log(data)
 
+    const isDark = this.theme_state().darkTheme;
+    const outcomeColor = isDark ? '#f38ba8' : '#d20f39'; // Red
+    const incomeColor = isDark ? '#a6e3a1' : '#40a02b';  // Green
+
     const options: any = {
-      theme: this.themeState().darkTheme ? 'ag-default-dark' : 'ag-default',
+      theme: isDark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
       series: [
@@ -476,6 +488,8 @@ export class BankTransactionsComponent implements OnInit {
           xKey: 'month',
           yKey: 'outcome',
           yName: 'Витрати (UAH)',
+          stroke: outcomeColor,
+          marker: {fill: outcomeColor, stroke: outcomeColor},
           tooltip: {
             renderer: ({datum}: { datum: any }) => ({
               title: datum.month,
@@ -488,10 +502,12 @@ export class BankTransactionsComponent implements OnInit {
           xKey: 'month',
           yKey: 'income',
           yName: 'Дохід (UAH)',
+          stroke: incomeColor,
+          marker: {fill: incomeColor, stroke: incomeColor},
           tooltip: {
             renderer: ({datum}: { datum: any }) => ({
               title: datum.month,
-              content: `Дохід: ${datum.outcome.toFixed(2)} UAH`,
+              content: `Дохід: ${datum.income.toFixed(2)} UAH`,
             }),
           },
         },

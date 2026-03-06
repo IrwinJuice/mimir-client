@@ -5,5 +5,5 @@ import {ThemeState} from '../themeswitcher';
   providedIn: 'root',
 })
 export class ThemeService {
-  themeState = signal<ThemeState>(null);
+  theme_state = signal<ThemeState>(null);
 }
