@@ -42,7 +42,7 @@
           },
           "configurations": {
             "production": {
-              "baseHref": "/bills/",
+              "baseHref": "/transactions/",
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",

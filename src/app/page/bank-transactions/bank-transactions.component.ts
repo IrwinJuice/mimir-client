@@ -329,6 +329,19 @@ export class BankTransactionsComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
+
+    this.t_service.refill_data_event$.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      switchMap((_) => {
+        const filter = this.t_service.last_transactions_filter;
+        return this.t_service.get_transactions(filter)
+      }),
+      tap((t_list) => {
+        this.transactions = t_list || [];
+        this.on_chart_select(this.chart_idx);
+      }),
+    ).subscribe();
+
   }
 
   to_uk_date(date: string) {

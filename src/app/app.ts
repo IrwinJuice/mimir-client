@@ -30,6 +30,7 @@ export class App implements OnInit {
   range_dates: Date[];
 
   constructor() {
+    let e = "u9kA-TTcNf-Dvcr77-T-y3jOZzbQZDssp7wsl82ny7So"
     this.items = [
       {
         label: 'Export',
@@ -66,11 +67,6 @@ export class App implements OnInit {
     this.web_socket_service.connect().subscribe({
       next: (msg) => {
         let notification = JSON.parse(msg.data) as WebSocketNotification;
-        console.log('Received:', notification)
-        console.log('event:', notification.event)
-        console.log('event:', notification.event === WebSocketNotificationKind.MONITOR_PENDING)
-
-
         switch (notification.event) {
           case WebSocketNotificationKind.ALL_MONITORS_UPDATED:
             this.message.add({
@@ -88,8 +84,8 @@ export class App implements OnInit {
             });
             break;
           case WebSocketNotificationKind.MONITOR_UPDATED:
-
             this.account_service.monitor_status = notification;
+            this.transaction_service.refill_data_event = Math.random();
             this.message.add({
               severity: 'success',
               summary: 'Оновлено',

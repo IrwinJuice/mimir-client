@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {MessageService} from 'primeng/api';
 import {HttpClient} from '@angular/common/http';
 import {environment} from '../../environments/environment';
-import {BehaviorSubject, catchError, Observable, of, Subject} from 'rxjs';
+import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
 
 export type CreateAccount = {
@@ -26,6 +26,38 @@ export enum AccountMonitorStatus {
   NEVER = 'Never',
   PENDING = 'Pending',
   UPDATED = 'Updated',
+}
+
+export enum ChartColorsLatte {
+  Lavender = '#7287fd',
+  Flamingo = '#dd7878',
+  Pink = '#ea76cb',
+  Mauve = '#8839ef',
+  Red = '#d20f39',
+  Maroon = '#e64553',
+  Peach = '#fe640b',
+  Yellow = '#df8e1d',
+  Green = '#40a02b',
+  Teal = '#179299',
+  Sky = '#04a5e5',
+  Sapphire = '#209fb5',
+  Blue = '#1e66f5',
+}
+
+export enum ChartColorsMocha {
+  Lavender = '#7287fd',
+  Flamingo = '#f2cdcd',
+  Green = '#a6e3a1',
+  Mauve = '#cba6f7',
+  Pink = '#f5c2e7',
+  Red = '#f38ba8',
+  Maroon = '#eba0ac',
+  Peach = '#fab387',
+  Yellow = '#f9e2af',
+  Teal = '#94e2d5',
+  Sky = '#89dceb',
+  Sapphire = '#74c7ec',
+  Blue = '#89b4fa',
 }
 
 export type AccountMonitor = {
@@ -56,6 +88,10 @@ export class AccountService {
 
   private _monitor_status = new Subject<WebSocketNotification>();
   monitor_status$ = this._monitor_status.asObservable();
+
+  // account_monitor - color
+  color_map: Map<String, String> = new Map();
+  color_array = ['Lavender', 'Flamingo', 'Green', 'Mauve', 'Red', 'Maroon', 'Peach', 'Yellow', 'Teal', 'Sky', 'Sapphire', 'Blue', 'Pink',];
 
   set accounts(next: Account[]) {
     this._accounts.next(next);
@@ -106,6 +142,17 @@ export class AccountService {
   get_account_monitors(idu: number): Observable<AccountMonitor[]> {
     const url = `${environment.apiBase}/users/${idu}/monitors`;
     return this.http.get<AccountMonitor[]>(url).pipe(
+      tap((monitors) => {
+        let count = 0;
+        for (let m of monitors) {
+          if (!this.color_map.has(m.external_id)) {
+            if (count >= this.color_array.length) {
+              count = 0;
+            }
+            this.color_map.set(m.external_id, this.color_array[count]);
+          }
+        }
+      }),
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
         return of(null);

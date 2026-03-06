@@ -1,8 +1,9 @@
-import {inject, Injectable} from '@angular/core';
+import {inject, Injectable, signal} from '@angular/core';
 import {MessageService} from 'primeng/api';
 import {HttpClient, HttpParams} from '@angular/common/http';
-import {catchError, Observable, of, tap} from 'rxjs';
+import {catchError, Observable, of, Subject, tap} from 'rxjs';
 import {environment} from '../../environments/environment';
+import {WebSocketNotification} from './web-socket-service';
 
 export interface BankTransaction {
   id: string,
@@ -54,6 +55,15 @@ export class TransactionService {
 
   current_transactions: BankTransaction[] = [];
   last_transactions_filter: BankTransactionFilter | null = null;
+
+  private _refill_data_event = new Subject<number>();
+  refill_data_event$ = this._refill_data_event.asObservable();
+
+
+  // just random number to trigger data update
+  set refill_data_event(notification: number) {
+    this._refill_data_event.next(notification);
+  }
 
 
   // Fetch transactions monitor by external_id
