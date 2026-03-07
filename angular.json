@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "bills-client": {
+    "transactions-client": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -37,12 +37,11 @@
               "includePaths": ["node_modules/"]
             },
             "polyfills": [
-              "@angular/localize/init"
             ]
           },
           "configurations": {
             "production": {
-              "baseHref": "/transactions/",
+              "baseHref": "/transactions",
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
@@ -53,7 +52,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "500kB",
-                  "maximumError": "1MB"
+                  "maximumError": "4MB"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -75,10 +74,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "bills-client:build:production"
+              "buildTarget": "transactions-client:build:production"
             },
             "development": {
-              "buildTarget": "bills-client:build:development"
+              "buildTarget": "transactions-client:build:development"
             }
           },
           "defaultConfiguration": "development"
