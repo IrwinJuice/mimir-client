@@ -1,9 +1,6 @@
 import {Injectable, signal} from '@angular/core';
 import {ThemeState} from '../themeswitcher';
 
-
-
-
 /**
  * PrimeNG CSS variable names used as chart colors.
  * Each entry maps to a --p-{color}-{shade} custom property on :root.
@@ -35,17 +32,22 @@ export function get_css_var(varName: string): string {
   providedIn: 'root',
 })
 export class ThemeService {
+  private color_pointer = 0;
+
   theme_state = signal<ThemeState>(null);
   // account_monitor → CSS variable name (e.g. '--p-blue-500')
-  color_map: Map<string, string> = new Map();
+  monitor_color_map: Map<string, string> = new Map();
   color_array = [...CHART_COLOR_VARS];
 
-  /** Returns the live resolved color for a given external_id.
-   *  Reads the CSS variable from the DOM, so it always reflects
-   *  the current PrimeNG theme (preset, primary, surface, dark/light). */
-  get_color(external_id: string): string {
-    const cssVar = this.color_map.get(external_id);
-    if (!cssVar) return get_css_var('--p-surface-500') || '#888888';
-    return get_css_var(cssVar);
+  resolve_monitor_color(external_id: string): string {
+    if (this.monitor_color_map.has(external_id)) {
+      return this.monitor_color_map.get(external_id);
+    } else {
+      let cssVar = this.color_array[this.color_pointer];
+      const color = get_css_var(cssVar);
+      this.monitor_color_map.set(external_id, color);
+      this.color_pointer++;
+      return color;
+    }
   }
 }

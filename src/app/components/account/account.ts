@@ -116,6 +116,7 @@ export class Account implements OnInit {
                 // include ida and external_id for reliable future lookups
                 ida: m.ida,
                 external_id: m.external_id,
+                color: this.theme_service.resolve_monitor_color(m.external_id),
                 kind: m.masked_pan,
                 loading: m.status === AccountMonitorStatus.PENDING,
                 balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
@@ -148,6 +149,7 @@ export class Account implements OnInit {
                 monitor.data = {
                   ida: m.ida,
                   external_id: m.external_id,
+                  color: this.theme_service.resolve_monitor_color(m.external_id),
                   kind: m.masked_pan,
                   loading: m.status === AccountMonitorStatus.PENDING,
                   balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,

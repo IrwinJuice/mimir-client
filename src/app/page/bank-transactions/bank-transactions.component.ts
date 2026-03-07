@@ -1,4 +1,4 @@
-import {Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
+import {ChangeDetectorRef, Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
 import {ChartModule} from 'primeng/chart';
 import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
@@ -57,6 +57,7 @@ export class BankTransactionsComponent implements OnInit {
   private account_service = inject(AccountService);
   private destroyRef = inject(DestroyRef);
   private theme_service = inject(ThemeService);
+  private cd = inject(ChangeDetectorRef);
 
 
   mcc_list: Mcc[] = [];
@@ -175,7 +176,6 @@ export class BankTransactionsComponent implements OnInit {
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
-        console.log('t_list', t_list)
         this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
       }),
@@ -259,18 +259,9 @@ export class BankTransactionsComponent implements OnInit {
 
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
 
-    let count = 0;
     const series = groups.map(([external_id, items]) => {
 
-      // fill color map
-      if (!this.theme_service.color_map.has(external_id)) {
-        if (count >= this.theme_service.color_array.length) {
-          count = 0;
-        }
-        this.theme_service.color_map.set(external_id, this.theme_service.color_array[count]);
-        count++;
-      }
-      const color = this.theme_service.get_color(external_id);
+      const color = this.theme_service.resolve_monitor_color(external_id);
       return {
         type: "bubble",
         sizeKey: "size_key",
@@ -318,7 +309,7 @@ export class BankTransactionsComponent implements OnInit {
           type: "number",
           position: "left",
           label: {
-            formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
+            formatter: ({value}: { value: number }) => value,
           },
         },
       },
@@ -332,6 +323,7 @@ export class BankTransactionsComponent implements OnInit {
       options.theme = "ag-default-dark";
     }
     this.options = options;
+    this.cd.detectChanges();
   }
 
 
@@ -363,7 +355,6 @@ export class BankTransactionsComponent implements OnInit {
     const isDark = this.theme_state().darkTheme;
     const outcomeColor = get_css_var('--p-red-500');
     const incomeColor = get_css_var('--p-green-500');
-
     const options = {
       theme: isDark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
@@ -371,32 +362,18 @@ export class BankTransactionsComponent implements OnInit {
 
       series: [
         {
-          type: 'line',
+          type: 'bar',
           xKey: 'month',
           yKey: 'outcome',
           yName: 'Витрати (UAH)',
-          stroke: outcomeColor,
-          marker: {fill: outcomeColor, stroke: outcomeColor},
-          tooltip: {
-            renderer: ({datum}: { datum: any }) => ({
-              title: datum.month,
-              content: `Витрати: ${datum.outcome.toFixed(2)} UAH`,
-            }),
-          },
+          fill: outcomeColor,
         },
         {
-          type: 'line',
+          type: 'bar',
           xKey: 'month',
           yKey: 'income',
           yName: 'Дохід (UAH)',
-          stroke: incomeColor,
-          marker: {fill: incomeColor, stroke: incomeColor},
-          tooltip: {
-            renderer: ({datum}: { datum: any }) => ({
-              title: datum.month,
-              content: `Дохід: ${datum.income.toFixed(2)} UAH`,
-            }),
-          },
+          fill: incomeColor,
         },
       ],
       axes: {
@@ -498,7 +475,6 @@ export class BankTransactionsComponent implements OnInit {
 
   apply_filter_changes() {
     const last = this.t_service.last_transactions_filter;
-    console.log('last', last)
     if (!last) return;
 
     const filter: BankTransactionFilter = {
