@@ -55,22 +55,36 @@ export class App implements OnInit {
     ]
   }
 
+  private readonly RANGE_STORAGE_KEY = 'app_date_range';
+
+  private saveDateRange(range: Date[]): void {
+    localStorage.setItem(this.RANGE_STORAGE_KEY, JSON.stringify(range.map(d => d.toISOString())));
+  }
+
+  private loadDateRange(): Date[] | null {
+    const stored = localStorage.getItem(this.RANGE_STORAGE_KEY);
+    if (!stored) return null;
+    try {
+      const parsed: string[] = JSON.parse(stored);
+      const dates = parsed.map(s => new Date(s));
+      if (dates.some(d => isNaN(d.getTime()))) return null;
+      return dates;
+    } catch {
+      return null;
+    }
+  }
+
   ngOnInit(): void {
     const now = new Date();
-    // set range to now and two months ago
     const twoMonthsAgo = new Date(now);
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    this.range_dates = [twoMonthsAgo, now];
+    const restored = this.loadDateRange();
+    this.range_dates = restored ?? [twoMonthsAgo, now];
     this.dt_service.time_range = this.range_dates;
 
     this.web_socket_service.connect().subscribe({
       next: (msg) => {
         let notification = JSON.parse(msg.data) as WebSocketNotification;
-        console.log('Received:', notification)
-        console.log('event:', notification.event)
-        console.log('event:', notification.event === WebSocketNotificationKind.MONITOR_PENDING)
-
-
         switch (notification.event) {
           case WebSocketNotificationKind.ALL_MONITORS_UPDATED:
             this.message.add({
@@ -88,8 +102,8 @@ export class App implements OnInit {
             });
             break;
           case WebSocketNotificationKind.MONITOR_UPDATED:
-
             this.account_service.monitor_status = notification;
+            this.transaction_service.refill_data_event = Date.now();//next random umber
             this.message.add({
               severity: 'success',
               summary: 'Оновлено',
@@ -106,6 +120,7 @@ export class App implements OnInit {
   protected onRangeChange(range: [Date, Date]) {
     if (range[0] && range[1]) {
       this.dt_service.time_range = this.range_dates;
+      this.saveDateRange(this.range_dates);
     }
   }
 

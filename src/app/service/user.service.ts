@@ -24,7 +24,7 @@ export class UserService {
   private _selected_user = new BehaviorSubject<User | null>(null);
   selected_user$ = this._selected_user.asObservable();
 
-  set selected_user(next: User) {
+  set selected_user(next: User | null) {
     this._selected_user.next(next);
   }
 
@@ -50,5 +50,14 @@ export class UserService {
           throw Error(error);
         })
       );
+  }
+
+  delete_user(idu: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiBase}/users/${idu}`).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
+        throw Error(error);
+      })
+    );
   }
 }

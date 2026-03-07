@@ -1,79 +1,33 @@
-import {Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
+import {ChangeDetectorRef, Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
 import {ChartModule} from 'primeng/chart';
-import {FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
+import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
 import {User, UserService} from '../../service/user.service';
-import {of, skip, switchMap, tap} from 'rxjs';
+import {of, skip, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
   BankTransactionFilter,
-  FilterCondition,
   FilterException,
   TransactionService
 } from '../../service/transaction.service';
+import {
+  AccountService,
+  EXCEPTIONS_STORAGE_KEY,
+  FILTER_FIELDS,
+  NUMBER_OPERATORS,
+  STRING_OPERATORS,
+} from '../../service/account.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
 import {AgCharts} from 'ag-charts-angular';
 import {DateTime} from 'luxon';
-import {ThemeService} from '../../service/theme.service';
+import {CHART_COLOR_VARS, get_css_var, ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
-import {Button} from 'primeng/button';
-import {Select} from 'primeng/select';
-import {InputText} from 'primeng/inputtext';
-import {Fieldset} from 'primeng/fieldset';
-import {Tooltip} from 'primeng/tooltip';
-import {AgBubbleSeriesStylerParams, AgBubbleSeriesStylerResult, AgTooltipRendererResult} from 'ag-charts-enterprise';
-
-export type FilterFieldType = 'number' | 'string';
-
-export interface FilterField {
-  label: string;
-  value: string;
-  type: FilterFieldType;
-}
-
-export interface FilterOperator {
-  label: string;
-  value: string;
-}
-
-const STRING_OPERATORS: FilterOperator[] = [
-  {label: 'Дорівнює', value: 'eq'},
-  {label: 'Не дорівнює', value: 'neq'},
-  {label: 'Починається з', value: 'startsWith'},
-  {label: 'Закінчується на', value: 'endsWith'},
-  {label: 'Містить', value: 'contains'},
-];
-
-const NUMBER_OPERATORS: FilterOperator[] = [
-  {label: '=', value: 'eq'},
-  {label: '!=', value: 'neq'},
-  {label: '<', value: 'lt'},
-  {label: '>', value: 'gt'},
-  {label: '≤', value: 'lte'},
-  {label: '≥', value: 'gte'},
-];
-
-const FILTER_FIELDS: FilterField[] = [
-  {label: 'Amount', value: 'amount', type: 'number'},
-  {label: 'Currency', value: 'currency', type: 'string'},
-  {label: 'Description', value: 'description', type: 'string'},
-  {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
-  {label: 'MCC', value: 'mcc', type: 'number'},
-  {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
-];
-
-const COMBINATORS = [
-  {label: 'AND NOT', value: 'AND NOT'},
-  {label: 'AND', value: 'AND'},
-  {label: 'OR NOT', value: 'OR NOT'},
-  {label: 'OR', value: 'OR'},
-];
-
-const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+import {AgTooltipRendererResult} from 'ag-charts-enterprise';
+import {Filter} from '../../components/filter/filter';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -89,11 +43,7 @@ const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
     TabPanels,
     TableModule,
     SelectButton,
-    Button,
-    Select,
-    InputText,
-    Fieldset,
-    Tooltip,
+    Filter,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -104,159 +54,93 @@ export class BankTransactionsComponent implements OnInit {
   private dt_service = inject(DateTimeService);
   protected user_service = inject(UserService);
   protected t_service = inject(TransactionService);
+  private account_service = inject(AccountService);
   private destroyRef = inject(DestroyRef);
-  private fb = inject(FormBuilder);
+  private theme_service = inject(ThemeService);
+  private cd = inject(ChangeDetectorRef);
+
 
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
 
   data: any = {labels: [], datasets: []};
-  options: any;
+  options: any = this.create_default_chart_options();
 
   user: User;
 
-  theme_service = inject(ThemeService);
-  themeState = this.theme_service.themeState;
+  theme_state = this.theme_service.theme_state;
   chart_options = [];
   chart_idx = 1;
 
-  filter_fields: FilterField[] = FILTER_FIELDS;
-  combinators = COMBINATORS;
+  exceptions: FilterException[] = [];
 
-  // Two-level FormArray:
-  // exceptions_form.exceptions = FormArray of groups
-  // each group = FormGroup { conditions: FormArray of condition rows }
-  exceptions_form: FormGroup = this.fb.group({
-    exceptions: this.fb.array([])
-  });
-
-  get exceptions(): FormArray {
-    return this.exceptions_form.get('exceptions') as FormArray;
-  }
-
-  get_conditions(groupIndex: number): FormArray {
-    return this.exceptions.at(groupIndex).get('conditions') as FormArray;
-  }
-
-  get_operators_for(groupIndex: number, condIndex: number): FilterOperator[] {
-    const field: FilterField | null = this.get_conditions(groupIndex).at(condIndex)?.get('field')?.value;
-    if (!field) return [];
-    return field.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
-  }
-
-  on_field_change(groupIndex: number, condIndex: number) {
-    this.get_conditions(groupIndex).at(condIndex).patchValue({operator: null, value: ''});
-  }
-
-  private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value: string = '') {
-    return this.fb.group({field: [field], operator: [operator], value: [value]});
-  }
-
-  add_filter_exception() {
-    const group = this.fb.group({
-      combinator: ['AND NOT'],
-      conditions: this.fb.array([this.new_condition_group()])
-    });
-    this.exceptions.push(group);
-  }
-
-  private add_default_exception(conditions: { field: FilterField, operator: FilterOperator, value: string }[]) {
-    const group = this.fb.group({
-      combinator: ['AND NOT'],
-      conditions: this.fb.array(conditions.map(c => this.new_condition_group(c.field, c.operator, c.value)))
-    });
-    this.exceptions.push(group);
-  }
-
-  remove_filter_exception(groupIndex: number) {
-
-    this.exceptions.removeAt(groupIndex);
-  }
-
-  private save_exceptions_to_storage(): void {
-    const data = this.build_exceptions();
-    localStorage.setItem(EXCEPTIONS_STORAGE_KEY, JSON.stringify(data));
-  }
-
-  private restore_exceptions_from_storage(): boolean {
-    try {
-      const raw = localStorage.getItem(EXCEPTIONS_STORAGE_KEY);
-      if (!raw) return false;
-      const parsed: FilterException[] = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return false;
-
-      for (const ex of parsed) {
-        const conditions = ex.conditions
-          .map(c => {
-            const field = FILTER_FIELDS.find(f => f.value === c.field) ?? null;
-            const operatorList = field?.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
-            const operator = operatorList.find(o => o.value === c.operator) ?? null;
-            return this.new_condition_group(field, operator, c.value);
-          });
-        const group = this.fb.group({
-          combinator: [ex.combinator ?? 'AND NOT'],
-          conditions: this.fb.array(conditions),
-        });
-        this.exceptions.push(group);
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private seed_default_exceptions(): void {
-    const mccField = FILTER_FIELDS.find(f => f.value === 'mcc')!;
-    const descField = FILTER_FIELDS.find(f => f.value === 'description')!;
-    const eqNum = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
-    const eqStr = STRING_OPERATORS.find(o => o.value === 'eq')!;
-
-    this.add_default_exception([
-      {field: mccField, operator: eqNum, value: '4829'},
-      {field: descField, operator: eqStr, value: 'Переказ на картку'},
-    ]);
-    this.add_default_exception([
-      {field: mccField, operator: eqNum, value: '4829'},
-      {field: descField, operator: eqStr, value: 'З Білої картки'},
-    ]);
-  }
-
-  add_condition(groupIndex: number) {
-    this.get_conditions(groupIndex).push(this.new_condition_group());
-  }
-
-  remove_condition(groupIndex: number, condIndex: number) {
-    const conditions = this.get_conditions(groupIndex);
-    if (conditions.length === 1) {
-      // removing last condition removes the whole group
-      this.exceptions.removeAt(groupIndex);
-    } else {
-      conditions.removeAt(condIndex);
-    }
-  }
 
   constructor() {
     this.chart_options = [
       {name: 'Загальна', chart_idx: 1},
-      {name: 'Option 2', chart_idx: 2},
-      {name: 'Option 3', chart_idx: 3}
+      {name: 'Дохід та витрати', chart_idx: 2},
+      {name: 'MCC Витрати', chart_idx: 3},
+      {name: 'MCC Дохід', chart_idx: 4}
     ];
 
-    const restored = this.restore_exceptions_from_storage();
-    if (!restored) {
-      this.seed_default_exceptions();
+    this.exceptions = this.restore_exceptions_from_storage();
+    if (this.exceptions.length < 1) {
+      this.exceptions = this.seed_default_exceptions();
     }
 
     effect(() => {
-      const state = this.themeState();
-      const options = {...this.options};
-      if (state.darkTheme) {
-        options.theme = "ag-default-dark";
-      } else {
-        options.theme = "ag-default";
-      }
-      this.options = options;
+      this.theme_state();
+      this.on_chart_select(this.chart_idx, this.transactions);
     });
+  }
+
+  /**
+   * Creates a minimal chart configuration used before transaction data is loaded.
+   * This keeps the chart binding stable and aligns the theme with the current app theme.
+   */
+  private create_default_chart_options() {
+    return {
+      theme: this.theme_service.theme_state().darkTheme ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data: [],
+      series: [],
+    };
+  }
+
+  private restore_exceptions_from_storage(): FilterException[] {
+    try {
+      const raw = localStorage.getItem(EXCEPTIONS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed: FilterException[] = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
+  }
+
+  private seed_default_exceptions(): FilterException[] {
+    const mccField = FILTER_FIELDS.find(f => f.value === 'mcc')!;
+    const descField = FILTER_FIELDS.find(f => f.value === 'description')!;
+    const eqNum = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
+    const eqStr = STRING_OPERATORS.find(o => o.value === 'eq')!;
+    const f: FilterException = {
+      combinator: 'AND NOT',
+      conditions: [
+        {field: mccField.value, operator: eqNum.value, value: '4829'},
+        {field: descField.value, operator: eqStr.value, value: 'Переказ на картку'},
+      ]
+    }
+
+    const s: FilterException = {
+      combinator: 'AND NOT',
+      conditions: [
+        {field: mccField.value, operator: eqNum.value, value: '4829'},
+        {field: descField.value, operator: eqStr.value, value: 'З Білої картки'},
+      ]
+    }
+
+    return [f, s];
   }
 
   ngOnInit() {
@@ -264,11 +148,17 @@ export class BankTransactionsComponent implements OnInit {
     this.user_service.selected_user$.pipe(
       skip(1),
       switchMap((user) => {
+        if (!user) {
+          return of([] as BankTransaction[]);
+        }
         this.user = user;
         return this.mcc_service.fetch_mcc_by_idu(user.idu);
       }),
-      switchMap((mcc_list) => {
-        this.mcc_list = mcc_list || [];
+      switchMap((mcc_list_or_empty) => {
+        if (!this.user) {
+          return of([] as BankTransaction[]);
+        }
+        this.mcc_list = (mcc_list_or_empty as Mcc[]) || [];
 
         let time_range = this.dt_service.time_range;
         if (!time_range || time_range.length < 2) {
@@ -285,17 +175,17 @@ export class BankTransactionsComponent implements OnInit {
         const filter: BankTransactionFilter = {
           external_id_list: [],
           ida_list: [],
-          // mcc_list: [],
           idu: this.user.idu,
           from,
           to,
-          exceptions: this.build_exceptions(),
+          exceptions: this.exceptions,
         }
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -317,16 +207,32 @@ export class BankTransactionsComponent implements OnInit {
           ...this.t_service.last_transactions_filter,
           from,
           to,
-          exceptions: this.build_exceptions(),
+          exceptions: this.exceptions,
         };
         this.t_service.last_transactions_filter = filter;
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
         this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
       takeUntilDestroyed(this.destroyRef)
+    ).subscribe();
+
+
+    this.t_service.refill_data_event$.pipe(
+      skip(1), // skip event from account.ts on_selection_change()
+      takeUntilDestroyed(this.destroyRef),
+      switchMap((_) => {
+        const filter = this.t_service.last_transactions_filter;
+        return this.t_service.get_transactions(filter)
+      }),
+      tap((t_list) => {
+        this.transactions = t_list || [];
+        this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
+      }),
     ).subscribe();
 
   }
@@ -336,60 +242,67 @@ export class BankTransactionsComponent implements OnInit {
   }
 
 
-  on_chart_select(idx: number) {
+  on_chart_select(idx: number, t_list: BankTransaction[]) {
     switch (idx) {
       case 1:
-        this.draw_main_chart()
+        this.draw_main_chart(t_list)
         break;
       case 2:
-        this.draw_income_outcome()
+        this.draw_income_outcome(t_list)
+        break;
+      case 3:
+        this.draw_mcc_outcome(t_list)
+        break;
+      case 4:
+        this.draw_mcc_income(t_list)
         break;
     }
 
   }
 
-  draw_main_chart() {
-
-    let data = [...this.transactions]
-      .map(t => {
-        let amount_key = 'amount_' + t.external_id;
-        return {
-          time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
-          time_string: this.to_uk_date(t.transaction_time),
-          external_id: t.external_id,
-          size_key: Math.abs(t.amount),
-          description: t.description,
-          masked_pan: t.masked_pan,
-          [amount_key]: t.amount / 100,
-        };
-      });
+  draw_main_chart(t_list: BankTransaction[]) {
+    let data = t_list.map(t => {
+      let amount_key = 'amount_' + t.external_id;
+      return {
+        time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
+        time_string: this.to_uk_date(t.transaction_time),
+        external_id: t.external_id,
+        size_key: Math.abs(t.amount),
+        description: t.description,
+        masked_pan: t.masked_pan,
+        [amount_key]: t.amount / 100,
+      };
+    });
 
     const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
 
-    const series = groups.map(([external_id, items]) => ({
-      type: "bubble",
-      sizeKey: "size_key",
-      xKey: "time",
-      yKey: "amount_" + external_id,
-      yName: items?.[0]?.masked_pan ?? external_id,
-      size: 10, //defaults to 7
-      maxSize: 30, //defaults to 30
-      styler: ({datum}: { datum: any }) => {
+    const series = groups.map(([external_id, items]) => {
 
-      },
-      tooltip: {
-        renderer: ({datum}: { datum: any }) => {
-          return {
-            title: datum.masked_pan,
-            heading: datum.description,
-            data: [
-              {label: "Amount", value: datum["amount_" + external_id]},
-              {label: "Time", value: datum["time_string"]}
-            ],
-          } as AgTooltipRendererResult;
+      const color = this.theme_service.resolve_monitor_color(external_id);
+      return {
+        type: "bubble",
+        sizeKey: "size_key",
+        xKey: "time",
+        yKey: "amount_" + external_id,
+        yName: items?.[0]?.masked_pan ?? external_id,
+        size: 10,
+        maxSize: 30,
+        fill: color,
+        stroke: color,
+        tooltip: {
+          renderer: ({datum}: { datum: any }) => {
+            return {
+              title: datum.masked_pan,
+              heading: datum.description,
+              data: [
+                {label: "Amount", value: datum["amount_" + external_id]},
+                {label: "Time", value: datum["time_string"]}
+              ],
+            } as AgTooltipRendererResult;
+          },
         },
-      },
-    }));
+      };
+    });
 
     let options = {
       theme: "ag-default",
@@ -399,37 +312,38 @@ export class BankTransactionsComponent implements OnInit {
       zoom: {enabled: true, minVisibleItems: 1},
       navigator: {enabled: true, miniChart: {enabled: true}},
       tooltip: {enabled: true},
-      axes: [
-        {
+      axes: {
+        x: {
           type: "time",
           position: "bottom",
-          label: {format: "%d.%m %H:%M", autoRotate: true},
+          label: {format: "%d.%m.%y", autoRotate: true},
         },
-        {
+        y: {
           type: "number",
           position: "left",
           label: {
-            formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
+            formatter: ({value}: { value: number }) => value,
           },
         },
-      ],
+      },
       data,
       series,
     };
 
 
-    const state = this.themeState();
+    const state = this.theme_state();
     if (state.darkTheme) {
       options.theme = "ag-default-dark";
     }
     this.options = options;
+    this.cd.detectChanges();
   }
 
 
-  draw_income_outcome() {
+  draw_income_outcome(t_list: BankTransaction[]) {
     // Group transactions by "YYYY-MM" month key
     const groups = Object.groupBy(
-      this.transactions,
+      t_list,
       (t) => DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toFormat('yyyy-MM')
     );
 
@@ -451,165 +365,129 @@ export class BankTransactionsComponent implements OnInit {
       })
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    console.log(data)
-
-    const options: any = {
-      theme: this.themeState().darkTheme ? 'ag-default-dark' : 'ag-default',
+    const isDark = this.theme_state().darkTheme;
+    const outcomeColor = get_css_var('--p-red-500');
+    const incomeColor = get_css_var('--p-green-500');
+    const options = {
+      theme: isDark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
+
       series: [
         {
-          type: 'line',
+          type: 'bar',
           xKey: 'month',
           yKey: 'outcome',
           yName: 'Витрати (UAH)',
-          tooltip: {
-            renderer: ({datum}: { datum: any }) => ({
-              title: datum.month,
-              content: `Витрати: ${datum.outcome.toFixed(2)} UAH`,
-            }),
-          },
+          fill: outcomeColor,
         },
         {
-          type: 'line',
+          type: 'bar',
           xKey: 'month',
           yKey: 'income',
           yName: 'Дохід (UAH)',
-          tooltip: {
-            renderer: ({datum}: { datum: any }) => ({
-              title: datum.month,
-              content: `Дохід: ${datum.outcome.toFixed(2)} UAH`,
-            }),
-          },
+          fill: incomeColor,
         },
       ],
-      axes: [
-        {type: 'category', position: 'bottom', label: {autoRotate: true}},
-        {type: 'number', position: 'left'},
-      ],
+      axes: {
+        x: {type: 'category', position: 'bottom', label: {autoRotate: true}},
+        y: {type: 'number', position: 'left'},
+      },
     };
 
     this.options = options;
+    this.cd.detectChanges();
   }
 
-  //
-  //   let radar: {angle_key: string, radius_key: number, radius_name: string}[] = []
-  //
-  //   this.transactions.map((tr) => {
-  //     if (tr.amount < 0) {
-  //
-  //     }
-  //   })
-  //
-  //   // // let groups_by_masked_pan = Map.groupBy(this.transactions, ({masked_pan}) => masked_pan);
-  //   //
-  //   // let groups = Map.groupBy(this.transactions, ({mcc}) => mcc);
-  //   // groups.forEach((value, key) => {
-  //   //   radar.push({})
-  //   // })
-  //
-  //
-  //   { type: 'radar-area', angleKey: 'department', radiusKey: 'quality', radiusName: `Quality` },
-  //
+  draw_mcc_outcome(t_list: BankTransaction[]) {
+    // Group transactions by MCC
+    const groups = Object.groupBy(
+      t_list,
+      (t) => t.mcc
+    );
 
-  // let data = [...this.transactions]
-  //
-  //   .map(t => {
-  //     let amount_key = 'amount_' + t.external_id;
-  //     return {
-  //       angleKey:
-  //       external_id: t.external_id,
-  //       size_key: Math.abs(t.amount),
-  //       [amount_key]: t.amount / 100,
-  //     };
-  //   });
-  // const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
-  //
-  //
-  // const series = groups.map(([external_id, items]) => ({
-  //   type: "pie",
-  //   angleKey: 'amount',
-  //   legendItemKey: 'asset',
-  //   sizeKey: "size_key",
-  //   xKey: "time",
-  //   yKey: "amount_" + external_id,
-  //   yName: external_id,
-  //   size: 10, //defaults to 7
-  //   maxSize: 30, //defaults to 30
-  //   tooltip: {
-  //     renderer: ({datum}: { datum: any }) => ({
-  //       title: external_id,
-  //       content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
-  //     }),
-  //   },
-  // }));
-  //
-  //
-  // let options = {
-  //   theme: "ag-default",
-  //   background: {
-  //     visible: false
-  //   },
-  //   zoom: {enabled: true, minVisibleItems: 1},
-  //   navigator: {enabled: true, miniChart: {enabled: true}},
-  //   tooltip: {enabled: true},
-  //   axes: [
-  //     {
-  //       type: "time",
-  //       position: "bottom",
-  //       label: {format: "%d.%m %H:%M", autoRotate: true},
-  //     },
-  //     {
-  //       type: "number",
-  //       position: "left",
-  //       label: {
-  //         formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
-  //       },
-  //     },
-  //   ],
-  //   data,
-  //   series,
-  // };
-  //
-  //
-  // const state = this.themeState();
-  // if (state.darkTheme) {
-  //   options.theme = "ag-default-dark";
-  // }
-  // this.options = options;
 
-  // }
-
-  private build_exceptions(): FilterException[] {
-    return this.exceptions.controls
-      .map(group => {
-        const conditions = (group.get('conditions') as FormArray).controls;
-        const built: FilterCondition[] = conditions
-          .filter(c => c.get('field')?.value && c.get('operator')?.value && c.get('value')?.value !== '')
-          .map(c => ({
-            field: (c.get('field')!.value as FilterField).value,
-            operator: (c.get('operator')!.value as FilterOperator).value,
-            value: String(c.get('value')!.value),
-          }));
-        return {combinator: group.get('combinator')!.value as string, conditions: built} as FilterException;
+    // Sum positive amounts (income) per month
+    const data = Object.entries(groups)
+      .map(([mcc, items]) => {
+        const outcome = (items ?? [])
+          .filter(t => t.amount < 0)
+          .reduce((sum, t) => sum + t.amount, 0);
+        return {
+          mcc_d: items[0].mcc_description,
+          label: `${mcc}:${items[0].mcc_description}`,
+          outcome: Math.abs(outcome) / 100,  // positive value, UAH
+        };
       })
-      .filter(ex => ex.conditions.length > 0);
+      .filter((o) => o.outcome !== 0)
+      .sort((a, b) => a.mcc_d.localeCompare(b.mcc_d));
+
+    const isDark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    const options = {
+      theme: isDark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'pie', angleKey: 'outcome', legendItemKey: 'label', fills}],
+    };
+
+    this.options = options;
+    this.cd.detectChanges();
   }
 
-  apply_exceptions() {
+  draw_mcc_income(t_list: BankTransaction[]) {
+    // Group transactions by MCC
+    const groups = Object.groupBy(
+      t_list,
+      (t) => t.mcc
+    );
+
+
+    // Sum positive amounts (income) per month
+    const data = Object.entries(groups)
+      .map(([mcc, items]) => {
+        const income = (items ?? [])
+          .filter(t => t.amount > 0)
+          .reduce((sum, t) => sum + t.amount, 0);
+        return {
+          // mcc,
+          mcc_d: items[0].mcc_description,
+          label: `${mcc}:${items[0].mcc_description}`,
+          income: Math.abs(income) / 100,  // positive value, UAH
+        };
+      })
+      .filter((i) => i.income !== 0)
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const isDark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    const options = {
+      theme: isDark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'pie', angleKey: 'income', legendItemKey: 'label', fills}],
+    };
+
+    this.options = options;
+    this.cd.detectChanges();
+  }
+
+
+  apply_filter_changes() {
     const last = this.t_service.last_transactions_filter;
     if (!last) return;
-    this.save_exceptions_to_storage();
+
     const filter: BankTransactionFilter = {
       ...last,
-      exceptions: this.build_exceptions(),
+      exceptions: this.exceptions,
     };
     this.t_service.get_transactions(filter).pipe(
+      take(1),
       tap((t_list) => {
         this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx);
+        this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
-      takeUntilDestroyed(this.destroyRef)
     ).subscribe();
   }
 }

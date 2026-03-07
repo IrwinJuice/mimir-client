@@ -2,8 +2,59 @@ import {inject, Injectable} from '@angular/core';
 import {MessageService} from 'primeng/api';
 import {HttpClient} from '@angular/common/http';
 import {environment} from '../../environments/environment';
-import {BehaviorSubject, catchError, Observable, of, Subject} from 'rxjs';
+import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
+
+
+export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+
+export const FILTER_FIELDS: FilterField[] = [
+  {label: 'Amount', value: 'amount', type: 'number'},
+  {label: 'Currency', value: 'currency', type: 'string'},
+  {label: 'Description', value: 'description', type: 'string'},
+  {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
+  {label: 'MCC', value: 'mcc', type: 'number'},
+  {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
+]
+
+export const STRING_OPERATORS: FilterOperator[] = [
+  {label: 'Дорівнює', value: 'eq'},
+  {label: 'Не дорівнює', value: 'neq'},
+  {label: 'Починається з', value: 'startsWith'},
+  {label: 'Закінчується на', value: 'endsWith'},
+  {label: 'Містить', value: 'contains'},
+];
+
+export const NUMBER_OPERATORS: FilterOperator[] = [
+  {label: '=', value: 'eq'},
+  {label: '!=', value: 'neq'},
+  {label: '<', value: 'lt'},
+  {label: '>', value: 'gt'},
+  {label: '≤', value: 'lte'},
+  {label: '≥', value: 'gte'},
+];
+
+
+export const COMBINATORS = [
+  {label: 'AND NOT', value: 'AND NOT'},
+  {label: 'AND', value: 'AND'},
+  {label: 'OR NOT', value: 'OR NOT'},
+  {label: 'OR', value: 'OR'},
+];
+
+export type FilterFieldType = 'number' | 'string';
+
+export interface FilterField {
+  label: string;
+  value: string;
+  type: FilterFieldType;
+}
+
+export interface FilterOperator {
+  label: string;
+  value: string;
+}
+
 
 export type CreateAccount = {
   idu: number,
@@ -57,6 +108,8 @@ export class AccountService {
   private _monitor_status = new Subject<WebSocketNotification>();
   monitor_status$ = this._monitor_status.asObservable();
 
+
+
   set accounts(next: Account[]) {
     this._accounts.next(next);
   }
@@ -68,6 +121,7 @@ export class AccountService {
   set monitor_status(notification: WebSocketNotification) {
     this._monitor_status.next(notification);
   }
+
 
   add_account(account: CreateAccount) {
     return this.http.post<Account>(`${environment.apiBase}/users/${account.idu}/accounts`, account)
@@ -120,6 +174,15 @@ export class AccountService {
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
         return of(null);
+      })
+    );
+  }
+
+  delete_account(idu: number, ida: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiBase}/users/${idu}/accounts/${ida}`).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
+        throw Error(error);
       })
     );
   }

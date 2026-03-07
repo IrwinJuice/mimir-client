@@ -4,7 +4,7 @@ import {Button} from 'primeng/button';
 import {Dialog} from 'primeng/dialog';
 import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
-import {AsyncPipe} from '@angular/common';
+import {AsyncPipe, JsonPipe} from '@angular/common';
 import {
   Account as BankAccount,
   AccountKind,
@@ -14,7 +14,7 @@ import {
   CreateAccount
 } from '../../service/account.service';
 import {finalize, map, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
-import {MessageService, TreeNode} from 'primeng/api';
+import {MessageService, TreeNode, TreeTableNode} from 'primeng/api';
 import {User} from '../../service/user.service';
 import {TreeTableModule} from 'primeng/treetable';
 import {DateTime} from 'luxon';
@@ -22,6 +22,8 @@ import * as cc from 'currency-codes';
 import {ProgressBar} from 'primeng/progressbar';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
+import {ThemeService} from '../../service/theme.service';
+import {TransactionService} from '../../service/transaction.service';
 
 interface Column {
   field: string;
@@ -40,7 +42,8 @@ interface Column {
     AsyncPipe,
     FormsModule,
     TreeTableModule,
-    ProgressBar
+    ProgressBar,
+    JsonPipe
   ],
   templateUrl: './account.html',
   styleUrl: './account.scss',
@@ -53,11 +56,13 @@ export class Account implements OnInit {
   loading = false;
 
   private formBuilder = inject(FormBuilder);
-  private account_service = inject(AccountService);
+  protected account_service = inject(AccountService);
+  protected theme_service = inject(ThemeService);
   private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
+  private t_service = inject(TransactionService);
 
   protected readonly account_kinds: AccountKind[] = [AccountKind.MONO];
   protected visible_account_dialog = false;
@@ -77,11 +82,11 @@ export class Account implements OnInit {
   ngOnInit(): void {
 
     this.cols = [
-      {field: 'kind', header: 'Аккаунт', width: '200px'},
-      // {field: 'iban', header: 'IBAN'},
-      {field: 'balance', header: 'Баланс', width: '100px'},
+      {field: 'kind', header: 'Аккаунт', width: '250px'},
+      {field: 'balance', header: 'Баланс', width: '150px'},
       {field: 'last_taken_date', header: 'З', width: '100px'},
       {field: 'updated_at', header: 'По', width: '100px'},
+      {field: 'iban', header: 'IBAN', width: '250px'},
     ];
 
 
@@ -104,8 +109,6 @@ export class Account implements OnInit {
       }),
       tap((monitors) => {
         this.monitors = monitors || [];
-        console.log(monitors)
-
         this.monitors.forEach((m) => {
           const parent = this.accountsTree.find(n => n.key === `account-${m.ida}`);
           if (parent) {
@@ -114,7 +117,9 @@ export class Account implements OnInit {
               data: {
                 // include ida and external_id for reliable future lookups
                 ida: m.ida,
+                iban: m.iban,
                 external_id: m.external_id,
+                color: this.theme_service.resolve_monitor_color(m.external_id),
                 kind: m.masked_pan,
                 loading: m.status === AccountMonitorStatus.PENDING,
                 balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
@@ -144,11 +149,11 @@ export class Account implements OnInit {
             let monitor = account.children.find((node) => node.data.external_id === notification.external_id);
             return this.account_service.get_account_monitor(this.user.idu, monitor.data.external_id).pipe(
               tap((m) => {
-                console.log('m', m)
                 monitor.data = {
-                  // include ida and external_id for reliable future lookups
                   ida: m.ida,
+                  iban: m.iban,
                   external_id: m.external_id,
+                  color: this.theme_service.resolve_monitor_color(m.external_id),
                   kind: m.masked_pan,
                   loading: m.status === AccountMonitorStatus.PENDING,
                   balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
@@ -166,6 +171,60 @@ export class Account implements OnInit {
       )
       .subscribe();
 
+  }
+
+  on_selection_change(keys: any): void {
+    this.selectionKeys = keys;
+
+    const ida_list: number[] = [];
+    const external_id_list: string[] = [];
+
+    for (const [key, val] of Object.entries(keys)) {
+      if (!(val as any)?.checked) continue;
+
+      if (key.startsWith('account-')) {
+        // key = 'account-1' → ida = 1
+        const ida = Number(key.slice('account-'.length));
+        if (!isNaN(ida)) ida_list.push(ida);
+      } else if (key.startsWith('monitor-')) {
+        // key = 'monitor-1-Vb2IecNJleJpaf68itjujQ' → external_id = 'Vb2IecNJleJpaf68itjujQ'
+        // format: monitor-{ida}-{external_id}  where external_id may contain '-'
+        const withoutPrefix = key.slice('monitor-'.length);          // '1-Vb2IecNJleJpaf68itjujQ'
+        const firstDash = withoutPrefix.indexOf('-');
+        if (firstDash !== -1) {
+          const external_id = withoutPrefix.slice(firstDash + 1);    // 'Vb2IecNJleJpaf68itjujQ'
+          external_id_list.push(external_id);
+        }
+      }
+    }
+
+    const last = this.t_service.last_transactions_filter;
+    if (!last) return;
+
+    this.t_service.last_transactions_filter = {
+      ...last,
+      ida_list,
+      external_id_list,
+    };
+
+    this.t_service.refill_data_event = Date.now();// next random namer
+  }
+
+  delete_account(ida: number): void {
+    this.account_service.delete_account(this.user.idu, ida).pipe(
+      take(1),
+      tap(() => {
+        this.accountsTree = this.accountsTree.filter(n => n.data.ida !== ida);
+        this.account_service.accounts = this.account_service.accounts.filter(a => a.ida !== ida);
+        // clean up selection keys for this account and its monitors
+        Object.keys(this.selectionKeys)
+          .filter(k => k === `account-${ida}` || k.startsWith(`monitor-${ida}-`))
+          .forEach(k => delete this.selectionKeys[k]);
+        this.message.add({severity: 'info', summary: 'Account', detail: 'Акаунт видалено.'});
+        this.on_selection_change({...this.selectionKeys});
+        this.cdr.detectChanges();
+      })
+    ).subscribe();
   }
 
   add_account() {
