@@ -22,7 +22,7 @@ import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
 import {AgCharts} from 'ag-charts-angular';
 import {DateTime} from 'luxon';
-import {get_css_var, ThemeService} from '../../service/theme.service';
+import {CHART_COLOR_VARS, get_css_var, ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
@@ -78,8 +78,9 @@ export class BankTransactionsComponent implements OnInit {
   constructor() {
     this.chart_options = [
       {name: 'Загальна', chart_idx: 1},
-      {name: 'Доходи та витрати', chart_idx: 2},
-      {name: 'Option 3', chart_idx: 3}
+      {name: 'Дохід та витрати', chart_idx: 2},
+      {name: 'MCC Витрати', chart_idx: 3},
+      {name: 'MCC Дохід', chart_idx: 4}
     ];
 
     this.exceptions = this.restore_exceptions_from_storage();
@@ -239,6 +240,12 @@ export class BankTransactionsComponent implements OnInit {
       case 2:
         this.draw_income_outcome(t_list)
         break;
+      case 3:
+        this.draw_mcc_outcome(t_list)
+        break;
+      case 4:
+        this.draw_mcc_income(t_list)
+        break;
     }
 
   }
@@ -272,10 +279,6 @@ export class BankTransactionsComponent implements OnInit {
         maxSize: 30,
         fill: color,
         stroke: color,
-        // styler: ({datum}: { datum: any }) => ({
-        //   fill: color,
-        //   stroke: color,
-        // }),
         tooltip: {
           renderer: ({datum}: { datum: any }) => {
             return {
@@ -385,93 +388,74 @@ export class BankTransactionsComponent implements OnInit {
     this.options = options;
   }
 
-  //
-  //   let radar: {angle_key: string, radius_key: number, radius_name: string}[] = []
-  //
-  //   this.transactions.map((tr) => {
-  //     if (tr.amount < 0) {
-  //
-  //     }
-  //   })
-  //
-  //   // // let groups_by_masked_pan = Map.groupBy(this.transactions, ({masked_pan}) => masked_pan);
-  //   //
-  //   // let groups = Map.groupBy(this.transactions, ({mcc}) => mcc);
-  //   // groups.forEach((value, key) => {
-  //   //   radar.push({})
-  //   // })
-  //
-  //
-  //   { type: 'radar-area', angleKey: 'department', radiusKey: 'quality', radiusName: `Quality` },
-  //
+  draw_mcc_outcome(t_list: BankTransaction[]) {
+    // Group transactions by MCC
+    const groups = Object.groupBy(
+      t_list,
+      (t) => t.mcc
+    );
 
-  // let data = [...this.transactions]
-  //
-  //   .map(t => {
-  //     let amount_key = 'amount_' + t.external_id;
-  //     return {
-  //       angleKey:
-  //       external_id: t.external_id,
-  //       size_key: Math.abs(t.amount),
-  //       [amount_key]: t.amount / 100,
-  //     };
-  //   });
-  // const groups = Object.entries(Object.groupBy(data, ({external_id}) => external_id));
-  //
-  //
-  // const series = groups.map(([external_id, items]) => ({
-  //   type: "pie",
-  //   angleKey: 'amount',
-  //   legendItemKey: 'asset',
-  //   sizeKey: "size_key",
-  //   xKey: "time",
-  //   yKey: "amount_" + external_id,
-  //   yName: external_id,
-  //   size: 10, //defaults to 7
-  //   maxSize: 30, //defaults to 30
-  //   tooltip: {
-  //     renderer: ({datum}: { datum: any }) => ({
-  //       title: external_id,
-  //       content: `${datum.time.toLocaleString()} — ${(datum.amount / 100).toFixed(2)} UAH`,
-  //     }),
-  //   },
-  // }));
-  //
-  //
-  // let options = {
-  //   theme: "ag-default",
-  //   background: {
-  //     visible: false
-  //   },
-  //   zoom: {enabled: true, minVisibleItems: 1},
-  //   navigator: {enabled: true, miniChart: {enabled: true}},
-  //   tooltip: {enabled: true},
-  //   axes: [
-  //     {
-  //       type: "time",
-  //       position: "bottom",
-  //       label: {format: "%d.%m %H:%M", autoRotate: true},
-  //     },
-  //     {
-  //       type: "number",
-  //       position: "left",
-  //       label: {
-  //         formatter: ({value}: { value: number }) => (value / 100).toFixed(2),
-  //       },
-  //     },
-  //   ],
-  //   data,
-  //   series,
-  // };
-  //
-  //
-  // const state = this.themeState();
-  // if (state.darkTheme) {
-  //   options.theme = "ag-default-dark";
-  // }
-  // this.options = options;
 
-  // }
+    // Sum positive amounts (income) per month
+    const data = Object.entries(groups)
+      .map(([mcc, items]) => {
+        const outcome = (items ?? [])
+          .filter(t => t.amount < 0)
+          .reduce((sum, t) => sum + t.amount, 0);
+        return {
+          mcc,
+          mcc_d: items[0].mcc_description,
+          outcome: Math.abs(outcome) / 100,  // positive value, UAH
+        };
+      })
+      .filter((o) => o.outcome !== 0);
+
+    const isDark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    const options = {
+      theme: isDark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'pie', angleKey: 'outcome', legendItemKey: 'mcc_d', fills}],
+    };
+
+    this.options = options;
+  }
+
+  draw_mcc_income(t_list: BankTransaction[]) {
+    // Group transactions by MCC
+    const groups = Object.groupBy(
+      t_list,
+      (t) => t.mcc
+    );
+
+
+    // Sum positive amounts (income) per month
+    const data = Object.entries(groups)
+      .map(([mcc, items]) => {
+        const income = (items ?? [])
+          .filter(t => t.amount > 0)
+          .reduce((sum, t) => sum + t.amount, 0);
+        return {
+          mcc,
+          mcc_d: items[0].mcc_description,
+          income: Math.abs(income) / 100,  // positive value, UAH
+        };
+      })
+      .filter((i) => i.income !== 0);
+
+    const isDark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    const options = {
+      theme: isDark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'pie', angleKey: 'income', legendItemKey: 'mcc_d', fills}],
+    };
+
+    this.options = options;
+  }
+
 
   apply_filter_changes() {
     const last = this.t_service.last_transactions_filter;

@@ -1,5 +1,6 @@
 import {Injectable, signal} from '@angular/core';
 import {ThemeState} from '../themeswitcher';
+import {BankTransaction} from './transaction.service';
 
 /**
  * PrimeNG CSS variable names used as chart colors.
@@ -43,6 +44,9 @@ export class ThemeService {
     if (this.monitor_color_map.has(external_id)) {
       return this.monitor_color_map.get(external_id);
     } else {
+      if (this.color_pointer >= this.color_array.length){
+        this.color_pointer = 0;
+      }
       let cssVar = this.color_array[this.color_pointer];
       const color = get_css_var(cssVar);
       this.monitor_color_map.set(external_id, color);
@@ -50,4 +54,10 @@ export class ThemeService {
       return color;
     }
   }
+
+  /** Resolves CHART_COLOR_VARS to actual colour values at the moment of calling. */
+  get_chart_fills(): string[] {
+    return CHART_COLOR_VARS.toReversed().map(v => get_css_var(v)).filter(c => c.length > 0);
+  }
+
 }
