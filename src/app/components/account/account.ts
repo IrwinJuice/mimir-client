@@ -174,7 +174,6 @@ export class Account implements OnInit {
   }
 
   on_selection_change(keys: any): void {
-    console.count('on_selection_change')
     this.selectionKeys = keys;
 
     const ida_list: number[] = [];
