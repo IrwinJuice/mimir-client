@@ -72,4 +72,23 @@ export class UserComponent implements OnInit {
   on_user_select(user: User) {
     this.userService.selected_user = user;
   }
+
+  delete_user() {
+    const user = this.selected_user;
+    if (!user) return;
+    this.userService.delete_user(user.idu).pipe(
+      take(1),
+      tap(() => {
+        this.users.update(list => list.filter(u => u.idu !== user.idu));
+        const remaining = this.users();
+        // clear first so bank-transactions clears its data
+        this.userService.selected_user = null;
+        this.selected_user = remaining[0] ?? undefined;
+        if (this.selected_user) {
+          this.userService.selected_user = this.selected_user;
+        }
+        this.message.add({severity: 'info', summary: 'User', detail: 'Користувача видалено.'});
+      })
+    ).subscribe();
+  }
 }

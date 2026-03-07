@@ -10,6 +10,9 @@
   }
 
   <p-button label="Додати" icon="pi pi-plus" (click)="visible_user_dialog = true"/>
+  <p-button label="Видалити користувача" icon="pi pi-trash" severity="danger" [text]="true"
+            [hidden]="!selected_user"
+            (click)="delete_user()"/>
 
   <p-dialog header="Додати нового користувача" [modal]="true" [(visible)]="visible_user_dialog"
             [style]="{ width: '25rem' }">

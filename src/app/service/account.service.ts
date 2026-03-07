@@ -178,4 +178,13 @@ export class AccountService {
     );
   }
 
+  delete_account(idu: number, ida: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiBase}/users/${idu}/accounts/${ida}`).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
+        throw Error(error);
+      })
+    );
+  }
+
 }

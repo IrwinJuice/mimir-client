@@ -148,11 +148,17 @@ export class BankTransactionsComponent implements OnInit {
     this.user_service.selected_user$.pipe(
       skip(1),
       switchMap((user) => {
+        if (!user) {
+          return of([] as BankTransaction[]);
+        }
         this.user = user;
         return this.mcc_service.fetch_mcc_by_idu(user.idu);
       }),
-      switchMap((mcc_list) => {
-        this.mcc_list = mcc_list || [];
+      switchMap((mcc_list_or_empty) => {
+        if (!this.user) {
+          return of([] as BankTransaction[]);
+        }
+        this.mcc_list = (mcc_list_or_empty as Mcc[]) || [];
 
         let time_range = this.dt_service.time_range;
         if (!time_range || time_range.length < 2) {

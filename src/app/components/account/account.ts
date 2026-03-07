@@ -82,8 +82,8 @@ export class Account implements OnInit {
   ngOnInit(): void {
 
     this.cols = [
-      {field: 'kind', header: 'Аккаунт', width: '200px'},
-      {field: 'balance', header: 'Баланс', width: '100px'},
+      {field: 'kind', header: 'Аккаунт', width: '250px'},
+      {field: 'balance', header: 'Баланс', width: '150px'},
       {field: 'last_taken_date', header: 'З', width: '100px'},
       {field: 'updated_at', header: 'По', width: '100px'},
       {field: 'iban', header: 'IBAN', width: '250px'},
@@ -209,6 +209,23 @@ export class Account implements OnInit {
     };
 
     this.t_service.refill_data_event = Date.now();// next random namer
+  }
+
+  delete_account(ida: number): void {
+    this.account_service.delete_account(this.user.idu, ida).pipe(
+      take(1),
+      tap(() => {
+        this.accountsTree = this.accountsTree.filter(n => n.data.ida !== ida);
+        this.account_service.accounts = this.account_service.accounts.filter(a => a.ida !== ida);
+        // clean up selection keys for this account and its monitors
+        Object.keys(this.selectionKeys)
+          .filter(k => k === `account-${ida}` || k.startsWith(`monitor-${ida}-`))
+          .forEach(k => delete this.selectionKeys[k]);
+        this.message.add({severity: 'info', summary: 'Account', detail: 'Акаунт видалено.'});
+        this.on_selection_change({...this.selectionKeys});
+        this.cdr.detectChanges();
+      })
+    ).subscribe();
   }
 
   add_account() {

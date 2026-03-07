@@ -53,6 +53,10 @@
                     <p-progress-bar mode="indeterminate" [style]="{ width: '40px', height: '6px' }" />
                   }
                   <span [style.color]="rowData['color']"><b>{{ rowData[col.field] }}</b></span>
+                  @if (!rowData['color']) {
+                    <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small"
+                              (click)="delete_account(rowData['ida'])" />
+                  }
                 </div>
               } @else {
                 {{ rowData[col.field] }}
