@@ -28,7 +28,9 @@
 
   @if (accounts && accounts.length > 0) {
 
-    <p-tree-table [value]="accountsTree" [columns]="cols" selectionMode="checkbox" [(selectionKeys)]="selectionKeys"
+    <p-tree-table [value]="accountsTree" [columns]="cols" selectionMode="checkbox"
+                  [selectionKeys]="selectionKeys"
+                  (selectionKeysChange)="on_selection_change($event)"
                   dataKey="key" [scrollable]="true" [tableStyle]="{ 'min-width': '50rem' }">
       <ng-template #header let-columns>
         <tr>

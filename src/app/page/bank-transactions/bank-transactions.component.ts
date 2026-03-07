@@ -179,6 +179,7 @@ export class BankTransactionsComponent implements OnInit {
       tap((t_list) => {
         this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
@@ -208,12 +209,14 @@ export class BankTransactionsComponent implements OnInit {
       tap((t_list) => {
         this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe();
 
 
     this.t_service.refill_data_event$.pipe(
+      skip(1), // skip event from account.ts on_selection_change()
       takeUntilDestroyed(this.destroyRef),
       switchMap((_) => {
         const filter = this.t_service.last_transactions_filter;
@@ -222,6 +225,7 @@ export class BankTransactionsComponent implements OnInit {
       tap((t_list) => {
         this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
     ).subscribe();
 
@@ -386,6 +390,7 @@ export class BankTransactionsComponent implements OnInit {
     };
 
     this.options = options;
+    this.cd.detectChanges();
   }
 
   draw_mcc_outcome(t_list: BankTransaction[]) {
@@ -421,6 +426,7 @@ export class BankTransactionsComponent implements OnInit {
     };
 
     this.options = options;
+    this.cd.detectChanges();
   }
 
   draw_mcc_income(t_list: BankTransaction[]) {
@@ -457,6 +463,7 @@ export class BankTransactionsComponent implements OnInit {
     };
 
     this.options = options;
+    this.cd.detectChanges();
   }
 
 
@@ -473,6 +480,7 @@ export class BankTransactionsComponent implements OnInit {
       tap((t_list) => {
         this.transactions = t_list || [];
         this.on_chart_select(this.chart_idx, t_list);
+        this.cd.detectChanges();
       }),
     ).subscribe();
   }

@@ -14,7 +14,7 @@ import {
   CreateAccount
 } from '../../service/account.service';
 import {finalize, map, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
-import {MessageService, TreeNode} from 'primeng/api';
+import {MessageService, TreeNode, TreeTableNode} from 'primeng/api';
 import {User} from '../../service/user.service';
 import {TreeTableModule} from 'primeng/treetable';
 import {DateTime} from 'luxon';
@@ -23,6 +23,7 @@ import {ProgressBar} from 'primeng/progressbar';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {ThemeService} from '../../service/theme.service';
+import {TransactionService} from '../../service/transaction.service';
 
 interface Column {
   field: string;
@@ -61,6 +62,7 @@ export class Account implements OnInit {
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
+  private t_service = inject(TransactionService);
 
   protected readonly account_kinds: AccountKind[] = [AccountKind.MONO];
   protected visible_account_dialog = false;
@@ -81,10 +83,10 @@ export class Account implements OnInit {
 
     this.cols = [
       {field: 'kind', header: 'Аккаунт', width: '200px'},
-      // {field: 'iban', header: 'IBAN'},
       {field: 'balance', header: 'Баланс', width: '100px'},
       {field: 'last_taken_date', header: 'З', width: '100px'},
       {field: 'updated_at', header: 'По', width: '100px'},
+      {field: 'iban', header: 'IBAN', width: '250px'},
     ];
 
 
@@ -115,6 +117,7 @@ export class Account implements OnInit {
               data: {
                 // include ida and external_id for reliable future lookups
                 ida: m.ida,
+                iban: m.iban,
                 external_id: m.external_id,
                 color: this.theme_service.resolve_monitor_color(m.external_id),
                 kind: m.masked_pan,
@@ -148,6 +151,7 @@ export class Account implements OnInit {
               tap((m) => {
                 monitor.data = {
                   ida: m.ida,
+                  iban: m.iban,
                   external_id: m.external_id,
                   color: this.theme_service.resolve_monitor_color(m.external_id),
                   kind: m.masked_pan,
@@ -167,6 +171,44 @@ export class Account implements OnInit {
       )
       .subscribe();
 
+  }
+
+  on_selection_change(keys: any): void {
+    console.count('on_selection_change')
+    this.selectionKeys = keys;
+
+    const ida_list: number[] = [];
+    const external_id_list: string[] = [];
+
+    for (const [key, val] of Object.entries(keys)) {
+      if (!(val as any)?.checked) continue;
+
+      if (key.startsWith('account-')) {
+        // key = 'account-1' → ida = 1
+        const ida = Number(key.slice('account-'.length));
+        if (!isNaN(ida)) ida_list.push(ida);
+      } else if (key.startsWith('monitor-')) {
+        // key = 'monitor-1-Vb2IecNJleJpaf68itjujQ' → external_id = 'Vb2IecNJleJpaf68itjujQ'
+        // format: monitor-{ida}-{external_id}  where external_id may contain '-'
+        const withoutPrefix = key.slice('monitor-'.length);          // '1-Vb2IecNJleJpaf68itjujQ'
+        const firstDash = withoutPrefix.indexOf('-');
+        if (firstDash !== -1) {
+          const external_id = withoutPrefix.slice(firstDash + 1);    // 'Vb2IecNJleJpaf68itjujQ'
+          external_id_list.push(external_id);
+        }
+      }
+    }
+
+    const last = this.t_service.last_transactions_filter;
+    if (!last) return;
+
+    this.t_service.last_transactions_filter = {
+      ...last,
+      ida_list,
+      external_id_list,
+    };
+
+    this.t_service.refill_data_event = Date.now();// next random namer
   }
 
   add_account() {

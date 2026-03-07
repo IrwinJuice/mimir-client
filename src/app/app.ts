@@ -103,7 +103,7 @@ export class App implements OnInit {
             break;
           case WebSocketNotificationKind.MONITOR_UPDATED:
             this.account_service.monitor_status = notification;
-            this.transaction_service.refill_data_event = Math.random();
+            this.transaction_service.refill_data_event = Date.now();//next random umber
             this.message.add({
               severity: 'success',
               summary: 'Оновлено',
