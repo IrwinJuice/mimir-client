@@ -57,7 +57,7 @@ export class ThemeService {
 
   /** Resolves CHART_COLOR_VARS to actual colour values at the moment of calling. */
   get_chart_fills(): string[] {
-    return CHART_COLOR_VARS.toReversed().map(v => get_css_var(v)).filter(c => c.length > 0);
+    return CHART_COLOR_VARS.map(v => get_css_var(v)).filter(c => c.length > 0);
   }
 
 }

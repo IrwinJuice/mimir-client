@@ -403,12 +403,13 @@ export class BankTransactionsComponent implements OnInit {
           .filter(t => t.amount < 0)
           .reduce((sum, t) => sum + t.amount, 0);
         return {
-          mcc,
           mcc_d: items[0].mcc_description,
+          label: `${mcc}:${items[0].mcc_description}`,
           outcome: Math.abs(outcome) / 100,  // positive value, UAH
         };
       })
-      .filter((o) => o.outcome !== 0);
+      .filter((o) => o.outcome !== 0)
+      .sort((a, b) => a.mcc_d.localeCompare(b.mcc_d));
 
     const isDark = this.theme_state().darkTheme;
     const fills = this.theme_service.get_chart_fills();
@@ -416,7 +417,7 @@ export class BankTransactionsComponent implements OnInit {
       theme: isDark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
-      series: [{type: 'pie', angleKey: 'outcome', legendItemKey: 'mcc_d', fills}],
+      series: [{type: 'pie', angleKey: 'outcome', legendItemKey: 'label', fills}],
     };
 
     this.options = options;
@@ -437,12 +438,14 @@ export class BankTransactionsComponent implements OnInit {
           .filter(t => t.amount > 0)
           .reduce((sum, t) => sum + t.amount, 0);
         return {
-          mcc,
+          // mcc,
           mcc_d: items[0].mcc_description,
+          label: `${mcc}:${items[0].mcc_description}`,
           income: Math.abs(income) / 100,  // positive value, UAH
         };
       })
-      .filter((i) => i.income !== 0);
+      .filter((i) => i.income !== 0)
+      .sort((a, b) => a.label.localeCompare(b.label));
 
     const isDark = this.theme_state().darkTheme;
     const fills = this.theme_service.get_chart_fills();
@@ -450,7 +453,7 @@ export class BankTransactionsComponent implements OnInit {
       theme: isDark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
-      series: [{type: 'pie', angleKey: 'income', legendItemKey: 'mcc_d', fills}],
+      series: [{type: 'pie', angleKey: 'income', legendItemKey: 'label', fills}],
     };
 
     this.options = options;
