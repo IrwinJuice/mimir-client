@@ -50,7 +50,7 @@
                   @if (rowData['loading']) {
                     <p-progress-bar mode="indeterminate" [style]="{ width: '40px', height: '6px' }" />
                   }
-                  <span>{{ rowData[col.field] }}</span>
+                  <span [style.color]="rowData['color']"><b>{{ rowData[col.field] }}</b></span>
                 </div>
               } @else {
                 {{ rowData[col.field] }}

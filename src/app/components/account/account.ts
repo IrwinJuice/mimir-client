@@ -4,7 +4,7 @@ import {Button} from 'primeng/button';
 import {Dialog} from 'primeng/dialog';
 import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
-import {AsyncPipe} from '@angular/common';
+import {AsyncPipe, JsonPipe} from '@angular/common';
 import {
   Account as BankAccount,
   AccountKind,
@@ -22,6 +22,7 @@ import * as cc from 'currency-codes';
 import {ProgressBar} from 'primeng/progressbar';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
+import {ThemeService} from '../../service/theme.service';
 
 interface Column {
   field: string;
@@ -40,7 +41,8 @@ interface Column {
     AsyncPipe,
     FormsModule,
     TreeTableModule,
-    ProgressBar
+    ProgressBar,
+    JsonPipe
   ],
   templateUrl: './account.html',
   styleUrl: './account.scss',
@@ -53,7 +55,8 @@ export class Account implements OnInit {
   loading = false;
 
   private formBuilder = inject(FormBuilder);
-  private account_service = inject(AccountService);
+  protected account_service = inject(AccountService);
+  protected theme_service = inject(ThemeService);
   private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
   private destroyRef = inject(DestroyRef);
@@ -104,8 +107,6 @@ export class Account implements OnInit {
       }),
       tap((monitors) => {
         this.monitors = monitors || [];
-        console.log(monitors)
-
         this.monitors.forEach((m) => {
           const parent = this.accountsTree.find(n => n.key === `account-${m.ida}`);
           if (parent) {
@@ -115,6 +116,7 @@ export class Account implements OnInit {
                 // include ida and external_id for reliable future lookups
                 ida: m.ida,
                 external_id: m.external_id,
+                color: this.theme_service.resolve_monitor_color(m.external_id),
                 kind: m.masked_pan,
                 loading: m.status === AccountMonitorStatus.PENDING,
                 balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
@@ -144,11 +146,10 @@ export class Account implements OnInit {
             let monitor = account.children.find((node) => node.data.external_id === notification.external_id);
             return this.account_service.get_account_monitor(this.user.idu, monitor.data.external_id).pipe(
               tap((m) => {
-                console.log('m', m)
                 monitor.data = {
-                  // include ida and external_id for reliable future lookups
                   ida: m.ida,
                   external_id: m.external_id,
+                  color: this.theme_service.resolve_monitor_color(m.external_id),
                   kind: m.masked_pan,
                   loading: m.status === AccountMonitorStatus.PENDING,
                   balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,

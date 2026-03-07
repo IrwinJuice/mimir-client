@@ -1,0 +1,74 @@
+<p-fieldset [legend]="'Фільтр (' + exceptions.controls.length + ')'" [collapsed]="true" [toggleable]="true">
+  <form [formGroup]="exceptions_form" class="w-full">
+    <div formArrayName="exceptions" class="flex flex-col gap-3 mt-2">
+      @for (group of exceptions.controls; track $index; let gi = $index) {
+        <div [formGroupName]="gi" class="border border-surface-200 dark:border-surface-700 rounded-lg p-3">
+          <!-- Group header -->
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <p-select
+                formControlName="combinator"
+                [options]="combinators"
+                optionLabel="label"
+                optionValue="value"
+                class="w-36"
+              />
+              <span class="text-xs text-surface-400">(умови групи об'єднані AND)</span>
+            </div>
+            <p-button icon="pi pi-times" severity="danger" [text]="true" size="small"
+                      (click)="remove_filter_exception(gi)" pTooltip="Видалити виключення"/>
+          </div>
+
+          <!-- Conditions rows -->
+          <div formArrayName="conditions" class="flex flex-col gap-2">
+            @for (cond of get_conditions(gi).controls; track $index; let ci = $index) {
+              <div [formGroupName]="ci" class="flex items-center gap-2">
+                <!-- AND label after first row -->
+                @if (ci > 0) {
+                  <span class="text-xs font-bold text-primary-500 w-8 text-center shrink-0">AND</span>
+                } @else {
+                  <span class="w-8 shrink-0"></span>
+                }
+
+                <!-- 1st: field -->
+                <p-select
+                  formControlName="field"
+                  [options]="filter_fields"
+                  optionLabel="label"
+                  placeholder="Поле"
+                  class="w-40"
+                  (onChange)="on_field_change(gi, ci)"
+                />
+                <!-- 2nd: operator -->
+                <p-select
+                  formControlName="operator"
+                  [options]="get_operators_for(gi, ci)"
+                  optionLabel="label"
+                  placeholder="Умова"
+                  class="w-36"
+                />
+                <!-- 3rd: value -->
+                <input
+                  pInputText
+                  formControlName="value"
+                  placeholder="Значення"
+                  class="flex-1"
+                />
+                <p-button icon="pi pi-minus" severity="secondary" [text]="true" size="small"
+                          (click)="remove_condition(gi, ci)" pTooltip="Видалити умову"/>
+              </div>
+            }
+          </div>
+
+          <!-- Add condition inside group -->
+          <p-button label="+ AND умова" [text]="true" size="small" severity="secondary"
+                    class="mt-2" (click)="add_condition(gi)"/>
+        </div>
+      }
+    </div>
+  </form>
+  <div class="flex gap-4 p-2">
+    <p-button label="Додати фільтр групу" size="small" icon="pi pi-plus" (click)="add_filter_exception()"/>
+    <p-button label="Застосувати" size="small" icon="pi pi-filter" (click)="apply_exceptions()"/>
+  </div>
+</p-fieldset>

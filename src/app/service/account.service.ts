@@ -5,6 +5,57 @@ import {environment} from '../../environments/environment';
 import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
 
+
+export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+
+export const FILTER_FIELDS: FilterField[] = [
+  {label: 'Amount', value: 'amount', type: 'number'},
+  {label: 'Currency', value: 'currency', type: 'string'},
+  {label: 'Description', value: 'description', type: 'string'},
+  {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
+  {label: 'MCC', value: 'mcc', type: 'number'},
+  {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
+]
+
+export const STRING_OPERATORS: FilterOperator[] = [
+  {label: 'Дорівнює', value: 'eq'},
+  {label: 'Не дорівнює', value: 'neq'},
+  {label: 'Починається з', value: 'startsWith'},
+  {label: 'Закінчується на', value: 'endsWith'},
+  {label: 'Містить', value: 'contains'},
+];
+
+export const NUMBER_OPERATORS: FilterOperator[] = [
+  {label: '=', value: 'eq'},
+  {label: '!=', value: 'neq'},
+  {label: '<', value: 'lt'},
+  {label: '>', value: 'gt'},
+  {label: '≤', value: 'lte'},
+  {label: '≥', value: 'gte'},
+];
+
+
+export const COMBINATORS = [
+  {label: 'AND NOT', value: 'AND NOT'},
+  {label: 'AND', value: 'AND'},
+  {label: 'OR NOT', value: 'OR NOT'},
+  {label: 'OR', value: 'OR'},
+];
+
+export type FilterFieldType = 'number' | 'string';
+
+export interface FilterField {
+  label: string;
+  value: string;
+  type: FilterFieldType;
+}
+
+export interface FilterOperator {
+  label: string;
+  value: string;
+}
+
+
 export type CreateAccount = {
   idu: number,
   kind: string,
@@ -26,38 +77,6 @@ export enum AccountMonitorStatus {
   NEVER = 'Never',
   PENDING = 'Pending',
   UPDATED = 'Updated',
-}
-
-export enum ChartColorsLatte {
-  Lavender = '#7287fd',
-  Flamingo = '#dd7878',
-  Pink = '#ea76cb',
-  Mauve = '#8839ef',
-  Red = '#d20f39',
-  Maroon = '#e64553',
-  Peach = '#fe640b',
-  Yellow = '#df8e1d',
-  Green = '#40a02b',
-  Teal = '#179299',
-  Sky = '#04a5e5',
-  Sapphire = '#209fb5',
-  Blue = '#1e66f5',
-}
-
-export enum ChartColorsMocha {
-  Lavender = '#7287fd',
-  Flamingo = '#f2cdcd',
-  Green = '#a6e3a1',
-  Mauve = '#cba6f7',
-  Pink = '#f5c2e7',
-  Red = '#f38ba8',
-  Maroon = '#eba0ac',
-  Peach = '#fab387',
-  Yellow = '#f9e2af',
-  Teal = '#94e2d5',
-  Sky = '#89dceb',
-  Sapphire = '#74c7ec',
-  Blue = '#89b4fa',
 }
 
 export type AccountMonitor = {
@@ -89,9 +108,7 @@ export class AccountService {
   private _monitor_status = new Subject<WebSocketNotification>();
   monitor_status$ = this._monitor_status.asObservable();
 
-  // account_monitor - color
-  color_map: Map<String, String> = new Map();
-  color_array = ['Lavender', 'Flamingo', 'Green', 'Mauve', 'Red', 'Maroon', 'Peach', 'Yellow', 'Teal', 'Sky', 'Sapphire', 'Blue', 'Pink',];
+
 
   set accounts(next: Account[]) {
     this._accounts.next(next);
@@ -104,6 +121,7 @@ export class AccountService {
   set monitor_status(notification: WebSocketNotification) {
     this._monitor_status.next(notification);
   }
+
 
   add_account(account: CreateAccount) {
     return this.http.post<Account>(`${environment.apiBase}/users/${account.idu}/accounts`, account)
@@ -142,17 +160,6 @@ export class AccountService {
   get_account_monitors(idu: number): Observable<AccountMonitor[]> {
     const url = `${environment.apiBase}/users/${idu}/monitors`;
     return this.http.get<AccountMonitor[]>(url).pipe(
-      tap((monitors) => {
-        let count = 0;
-        for (let m of monitors) {
-          if (!this.color_map.has(m.external_id)) {
-            if (count >= this.color_array.length) {
-              count = 0;
-            }
-            this.color_map.set(m.external_id, this.color_array[count]);
-          }
-        }
-      }),
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
         return of(null);
