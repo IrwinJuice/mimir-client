@@ -23,6 +23,7 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {ThemeService} from '../../service/theme.service';
 import {TransactionService} from '../../service/transaction.service';
+import {Popover} from 'primeng/popover';
 
 interface Column {
   field: string;
@@ -42,6 +43,7 @@ interface Column {
     FormsModule,
     TreeTableModule,
     ProgressBar,
+    Popover,
   ],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss',
