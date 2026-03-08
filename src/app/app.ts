@@ -38,17 +38,17 @@ export class App implements OnInit {
           {
             label: 'CSV',
             icon: 'pi pi-file-plus',
-            command: _ => this.download_csv()
+            command: () => this.download_csv()
           },
           {
             label: 'XLSX',
             icon: 'pi pi-file-excel',
-            command: _ => this.download_xlsx()
+            command: () => this.download_xlsx()
           },
           {
             label: 'JSON',
             icon: 'pi pi-file',
-            command: _ => this.download_json()
+            command: () => this.download_json()
           }
         ]
       }
@@ -57,11 +57,11 @@ export class App implements OnInit {
 
   private readonly RANGE_STORAGE_KEY = 'app_date_range';
 
-  private saveDateRange(range: Date[]): void {
+  private save_date_range(range: Date[]): void {
     localStorage.setItem(this.RANGE_STORAGE_KEY, JSON.stringify(range.map(d => d.toISOString())));
   }
 
-  private loadDateRange(): Date[] | null {
+  private load_date_range(): Date[] | null {
     const stored = localStorage.getItem(this.RANGE_STORAGE_KEY);
     if (!stored) return null;
     try {
@@ -76,15 +76,15 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     const now = new Date();
-    const twoMonthsAgo = new Date(now);
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    const restored = this.loadDateRange();
-    this.range_dates = restored ?? [twoMonthsAgo, now];
+    const two_months_ago = new Date(now);
+    two_months_ago.setMonth(two_months_ago.getMonth() - 2);
+    const restored = this.load_date_range();
+    this.range_dates = restored ?? [two_months_ago, now];
     this.dt_service.time_range = this.range_dates;
 
     this.web_socket_service.connect().subscribe({
       next: (msg) => {
-        let notification = JSON.parse(msg.data) as WebSocketNotification;
+        const notification = JSON.parse(msg.data) as WebSocketNotification;
         switch (notification.event) {
           case WebSocketNotificationKind.ALL_MONITORS_UPDATED:
             this.message.add({
@@ -117,10 +117,10 @@ export class App implements OnInit {
     })
   }
 
-  protected onRangeChange(range: [Date, Date]) {
+  protected on_range_change(range: [Date, Date]) {
     if (range[0] && range[1]) {
       this.dt_service.time_range = this.range_dates;
-      this.saveDateRange(this.range_dates);
+      this.save_date_range(this.range_dates);
     }
   }
 

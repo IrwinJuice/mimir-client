@@ -89,8 +89,8 @@ export class Filter implements OnInit {
         const conditions = ex.conditions
           .map(c => {
             const field = FILTER_FIELDS.find(f => f.value === c.field) ?? null;
-            const operatorList = field?.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
-            const operator = operatorList.find(o => o.value === c.operator) ?? null;
+            const operator_list = field?.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
+            const operator = operator_list.find(o => o.value === c.operator) ?? null;
             return this.new_condition_group(field, operator, c.value);
           });
         const group = this.fb.group({
@@ -102,15 +102,10 @@ export class Filter implements OnInit {
     }
   }
 
-  constructor() {
-
-  }
-
   /**
    * Emits the current exception state after Angular input/output bindings are ready.
    */
   ngOnInit() {
-    // Emit after Angular has wired up parent bindings — so parent's [(ex)] and (exChange) are active
     this.exChange.emit(this.build_exceptions());
   }
 
@@ -124,10 +119,10 @@ export class Filter implements OnInit {
   /**
    * Returns the conditions form array for a specific exception group.
    *
-   * @param groupIndex Index of the exception group.
+   * @param group_index Index of the exception group.
    */
-  get_conditions(groupIndex: number): FormArray {
-    return this.exceptions.at(groupIndex).get('conditions') as FormArray;
+  get_conditions(group_index: number): FormArray {
+    return this.exceptions.at(group_index).get('conditions') as FormArray;
   }
 
   /**
@@ -135,11 +130,11 @@ export class Filter implements OnInit {
    *
    * Numeric fields use numeric operators; all other fields use string operators.
    *
-   * @param groupIndex Index of the exception group.
-   * @param condIndex Index of the condition inside the group.
+   * @param group_index Index of the exception group.
+   * @param cond_index Index of the condition inside the group.
    */
-  get_operators_for(groupIndex: number, condIndex: number): FilterOperator[] {
-    const field: FilterField | null = this.get_conditions(groupIndex).at(condIndex)?.get('field')?.value;
+  get_operators_for(group_index: number, cond_index: number): FilterOperator[] {
+    const field: FilterField | null = this.get_conditions(group_index).at(cond_index)?.get('field')?.value;
     if (!field) return [];
     return field.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
   }
@@ -149,20 +144,20 @@ export class Filter implements OnInit {
    *
    * If no field is selected, dependent controls are disabled and reset.
    *
-   * @param groupIndex Index of the exception group.
-   * @param condIndex Index of the condition inside the group.
+   * @param group_index Index of the exception group.
+   * @param cond_index Index of the condition inside the group.
    */
-  on_field_change(groupIndex: number, condIndex: number) {
-    const cond = this.get_conditions(groupIndex).at(condIndex);
-    const hasField = !!cond.get('field')?.value;
-    const operatorCtrl = cond.get('operator')!;
-    const valueCtrl = cond.get('value')!;
-    if (hasField) {
-      operatorCtrl.enable();
-      valueCtrl.enable();
+  on_field_change(group_index: number, cond_index: number) {
+    const cond = this.get_conditions(group_index).at(cond_index);
+    const has_field = !!cond.get('field')?.value;
+    const operator_ctrl = cond.get('operator')!;
+    const value_ctrl = cond.get('value')!;
+    if (has_field) {
+      operator_ctrl.enable();
+      value_ctrl.enable();
     } else {
-      operatorCtrl.disable();
-      valueCtrl.disable();
+      operator_ctrl.disable();
+      value_ctrl.disable();
     }
     cond.patchValue({operator: null, value: ''});
   }
@@ -176,12 +171,12 @@ export class Filter implements OnInit {
    * @param operator Initial operator value.
    * @param value Initial comparison value.
    */
-  private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value: string = '') {
-    const hasField = !!field;
+  private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value = '') {
+    const has_field = !!field;
     return this.fb.group({
       field: [field],
-      operator: [{value: operator, disabled: !hasField}],
-      value: [{value: value, disabled: !hasField}],
+      operator: [{value: operator, disabled: !has_field}],
+      value: [{value: value, disabled: !has_field}],
     });
   }
 
@@ -212,10 +207,10 @@ export class Filter implements OnInit {
   /**
    * Removes a filter exception group by index.
    *
-   * @param groupIndex Index of the group to remove.
+   * @param group_index Index of the group to remove.
    */
-  remove_filter_exception(groupIndex: number) {
-    this.exceptions.removeAt(groupIndex);
+  remove_filter_exception(group_index: number) {
+    this.exceptions.removeAt(group_index);
   }
 
   /**
@@ -231,8 +226,8 @@ export class Filter implements OnInit {
    *
    * @param groupIndex Index of the exception group to update.
    */
-  add_condition(groupIndex: number) {
-    this.get_conditions(groupIndex).push(this.new_condition_group());
+  add_condition(group_index: number) {
+    this.get_conditions(group_index).push(this.new_condition_group());
   }
 
   /**
@@ -243,13 +238,12 @@ export class Filter implements OnInit {
    * @param groupIndex Index of the exception group.
    * @param condIndex Index of the condition to remove.
    */
-  remove_condition(groupIndex: number, condIndex: number) {
-    const conditions = this.get_conditions(groupIndex);
+  remove_condition(group_index: number, cond_index: number) {
+    const conditions = this.get_conditions(group_index);
     if (conditions.length === 1) {
-      // removing last condition removes the whole group
-      this.exceptions.removeAt(groupIndex);
+      this.exceptions.removeAt(group_index);
     } else {
-      conditions.removeAt(condIndex);
+      conditions.removeAt(cond_index);
     }
   }
 

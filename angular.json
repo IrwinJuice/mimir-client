@@ -3,11 +3,14 @@
   "version": 1,
   "cli": {
     "analytics": false,
-    "packageManager": "npm"
+    "packageManager": "npm",
+    "schematicCollections": [
+      "angular-eslint"
+    ]
   },
   "newProjectRoot": "projects",
   "projects": {
-    "transactions-client": {
+    "mimir-client": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -34,10 +37,11 @@
               "src/styles.scss"
             ],
             "stylePreprocessorOptions": {
-              "includePaths": ["node_modules/"]
+              "includePaths": [
+                "node_modules/"
+              ]
             },
-            "polyfills": [
-            ]
+            "polyfills": []
           },
           "configurations": {
             "production": {
@@ -74,16 +78,25 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "transactions-client:build:production"
+              "buildTarget": "mimir-client:build:production"
             },
             "development": {
-              "buildTarget": "transactions-client:build:development"
+              "buildTarget": "mimir-client:build:development"
             }
           },
           "defaultConfiguration": "development"
         },
         "test": {
           "builder": "@angular/build:unit-test"
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
+          }
         }
       }
     }

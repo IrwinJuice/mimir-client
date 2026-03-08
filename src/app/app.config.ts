@@ -13,7 +13,7 @@ import { AllEnterpriseModule } from 'ag-charts-enterprise';
 // Enable all Community features
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
-export const appConfig: ApplicationConfig = {
+export const app_config: ApplicationConfig = {
   providers: [
     provideHttpClient(withFetch()),
     provideBrowserGlobalErrorListeners(),

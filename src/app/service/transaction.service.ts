@@ -1,9 +1,8 @@
-import {inject, Injectable, signal} from '@angular/core';
+import {inject, Injectable} from '@angular/core';
 import {MessageService} from 'primeng/api';
-import {HttpClient, HttpParams} from '@angular/common/http';
+import {HttpClient} from '@angular/common/http';
 import {catchError, Observable, of, Subject, tap} from 'rxjs';
 import {environment} from '../../environments/environment';
-import {WebSocketNotification} from './web-socket-service';
 
 export interface BankTransaction {
   id: string,
@@ -37,7 +36,6 @@ export interface FilterException {
 }
 
 export interface BankTransactionFilter {
-  idu: number,
   ida_list: number[],
   external_id_list: string[],
   exceptions?: FilterException[],
@@ -69,7 +67,7 @@ export class TransactionService {
   // Fetch transactions monitor by external_id
   get_transactions(filter: BankTransactionFilter): Observable<BankTransaction[]> {
     this.last_transactions_filter = filter;
-    const url = `${environment.apiBase}/users/${filter.idu}/transactions`;
+    const url = `${environment.apiBase}/transactions`;
     return this.http.post<BankTransaction[]>(url, filter).pipe(
       tap((ts) => this.current_transactions = ts),
       catchError(error => {
@@ -82,7 +80,7 @@ export class TransactionService {
   // Download transactions as CSV file
   download_csv(filter: BankTransactionFilter): void {
 
-    const url = `${environment.apiBase}/users/${filter.idu}/transactions/csv`;
+    const url = `${environment.apiBase}/transactions/csv`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
@@ -112,7 +110,7 @@ export class TransactionService {
   // Download transactions as xlsx file
   download_xlsx(filter: BankTransactionFilter): void {
 
-    const url = `${environment.apiBase}/users/${filter.idu}/transactions/xlsx`;
+    const url = `${environment.apiBase}/transactions/xlsx`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
@@ -142,7 +140,7 @@ export class TransactionService {
   // Download transactions as json file
   download_json(filter: BankTransactionFilter): void {
 
-    const url = `${environment.apiBase}/users/${filter.idu}/transactions/json`;
+    const url = `${environment.apiBase}/transactions/json`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});

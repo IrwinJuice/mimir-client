@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {MessageService} from 'primeng/api';
 import {HttpClient} from '@angular/common/http';
 import {environment} from '../../environments/environment';
-import {BehaviorSubject, catchError, Observable, of, Subject, tap} from 'rxjs';
+import {BehaviorSubject, catchError, Observable, of, Subject} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
 
 
@@ -56,17 +56,16 @@ export interface FilterOperator {
 }
 
 
-export type CreateAccount = {
-  idu: number,
+export interface CreateAccount {
   kind: string,
   token: string
+  name: string
 }
 
-export type Account = {
+export interface Account {
   ida: number,
-  idu: number,
   kind: string,
-  token: string
+  name: string
 }
 
 export enum AccountKind {
@@ -79,7 +78,7 @@ export enum AccountMonitorStatus {
   UPDATED = 'Updated',
 }
 
-export type AccountMonitor = {
+export interface AccountMonitor {
   ida: number,
   external_id: string,
   currency_code: number,
@@ -124,7 +123,7 @@ export class AccountService {
 
 
   add_account(account: CreateAccount) {
-    return this.http.post<Account>(`${environment.apiBase}/users/${account.idu}/accounts`, account)
+    return this.http.post<Account>(`${environment.apiBase}/accounts`, account)
       .pipe(
         catchError(error => {
           this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
@@ -133,8 +132,8 @@ export class AccountService {
       );
   }
 
-  get_accounts_by_idu(idu: number): Observable<Account[]> {
-    return this.http.get<Account[]>(`${environment.apiBase}/users/${idu}/accounts`)
+  get_accounts(): Observable<Account[]> {
+    return this.http.get<Account[]>(`${environment.apiBase}/accounts`)
       .pipe(
         catchError(error => {
           this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
@@ -144,10 +143,10 @@ export class AccountService {
   }
 
   // Update accounts statistics for the given user in the time range
-  update_accounts_stat(idu: number, from: string | number, to: string | number): Observable<AccountMonitor[]> {
-    const fromParam = encodeURIComponent(String(from));
-    const toParam = encodeURIComponent(String(to));
-    const url = `${environment.apiBase}/users/${idu}/accounts/stat?from=${fromParam}&to=${toParam}`;
+  update_accounts_stat(from: string | number, to: string | number): Observable<AccountMonitor[]> {
+    const from_param = encodeURIComponent(String(from));
+    const to_param = encodeURIComponent(String(to));
+    const url = `${environment.apiBase}/accounts/stat?from=${from_param}&to=${to_param}`;
     return this.http.put<AccountMonitor[]>(url, {}).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
@@ -156,9 +155,9 @@ export class AccountService {
     );
   }
 
-  // Fetch account monitors for the given user in the time range
-  get_account_monitors(idu: number): Observable<AccountMonitor[]> {
-    const url = `${environment.apiBase}/users/${idu}/monitors`;
+  // Fetch accounts monitors
+  get_accounts_monitors(): Observable<AccountMonitor[]> {
+    const url = `${environment.apiBase}/monitors`;
     return this.http.get<AccountMonitor[]>(url).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
@@ -168,8 +167,8 @@ export class AccountService {
   }
 
   // Fetch account monitor by external_id
-  get_account_monitor(idu: number, external_id: string): Observable<AccountMonitor> {
-    const url = `${environment.apiBase}/users/${idu}/monitors/${external_id}`;
+  get_account_monitor(external_id: string): Observable<AccountMonitor> {
+    const url = `${environment.apiBase}/monitors/${external_id}`;
     return this.http.get<AccountMonitor>(url).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
@@ -178,8 +177,17 @@ export class AccountService {
     );
   }
 
-  delete_account(idu: number, ida: number): Observable<void> {
-    return this.http.delete<void>(`${environment.apiBase}/users/${idu}/accounts/${ida}`).pipe(
+  update_account(ida: number, name: string, token: string): Observable<Account> {
+    return this.http.put<Account>(`${environment.apiBase}/accounts/${ida}`, {name, token}).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
+        throw Error(error);
+      })
+    );
+  }
+
+  delete_account(ida: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiBase}/accounts/${ida}`).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});
         throw Error(error);

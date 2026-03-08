@@ -1,0 +1,119 @@
+@let accounts = accounts$ | async;
+<div class="flex flex-col gap-4">
+  <div class="flex items-center gap-2">
+    <p-button label="Додати" icon="pi pi-plus" (click)="visible_account_dialog = true"/>
+    @if (accounts && accounts.length > 0) {
+      <p-button [disabled]="loading" [icon]="loading ? 'pi pi-spinner pi-spin' : 'pi pi-sync'"
+                label="Зібрати статистику" (click)="fetch_stats()"/>
+      <p-popover #op>
+        <ng-template #content>
+          <div class="max-w-80 space-y-3 text-sm leading-5">
+            <h3 class="text-base font-semibold">Обмеження які накладають банки</h3>
+            <ul class="font-semibold">
+              <li>
+                Monobank
+                <ul class="list-disc space-y-1 pl-4">
+                  <li>Максимальний проміжок виписки: 31 доба + 1 година за раз.</li>
+                  <li>Запитувати не частіше ніж 1 раз у 60 секунд.</li>
+
+                  <div class="rounded-lg border border-gray-200 p-3">
+                    <p class="font-semibold">Приклад часу збору за 2 місяці для 5 рахунків:</p>
+                    <p>1 отримання рахунків + 2 місяці * 5 рахунків ≈ 11 хвилин</p>
+                  </div>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </ng-template>
+      </p-popover>
+      <p-button (click)="op.toggle($event)" icon="pi pi-info-circle" [rounded]="true" [text]="true"
+                severity="info"></p-button>
+    }
+  </div>
+  <p-dialog header="Додати банківський аккаунт" [modal]="true" [(visible)]="visible_account_dialog"
+            [style]="{ width: '25rem' }">
+    <form class="flex-col items-center gap-4 mb-4" [formGroup]="account_form" action="" (submit)="add_account()">
+      <div class="flex items-center gap-4 mb-4">
+        <label for="account_kind" class="font-semibold w-24">Тип</label>
+        <p-select id="account_kind" [options]="account_kinds" formControlName="account_kind"
+                  class="w-full md:w-56"/>
+      </div>
+      <div class="flex items-center gap-4 mb-4">
+        <label for="account_name" class="font-semibold w-24">Назва</label>
+        <input pInputText id="account_name" formControlName="account_name" class="flex-auto" autocomplete="off"/>
+      </div>
+      <div class="flex items-center gap-4 mb-4">
+        <label for="account_token" class="font-semibold w-24">Token</label>
+        <input pInputText id="account_token" formControlName="account_token" class="flex-auto" autocomplete="off"/>
+      </div>
+      <div class="flex justify-end gap-2">
+        <p-button type="button" label="Відмінити" severity="secondary" (click)="visible_account_dialog = false"/>
+        <p-button type="submit" [disabled]="!account_form.valid" label="Зберегти"/>
+      </div>
+    </form>
+  </p-dialog>
+
+  <p-dialog header="Редагувати аккаунт" [modal]="true" [(visible)]="visible_edit_dialog"
+            [style]="{ width: '25rem' }">
+    <form class="flex-col items-center gap-4 mb-4" [formGroup]="edit_form" (submit)="save_edit_account()">
+      <div class="flex items-center gap-4 mb-4">
+        <label for="edit_name" class="font-semibold w-24">Назва</label>
+        <input pInputText id="edit_name" formControlName="edit_name" class="flex-auto" autocomplete="off"/>
+      </div>
+      <div class="flex items-center gap-4 mb-4">
+        <label for="edit_token" class="font-semibold w-24">Token</label>
+        <input pInputText id="edit_token" formControlName="edit_token" class="flex-auto" autocomplete="off"/>
+      </div>
+      <p>Необов'язково заповнювати всі поля, заповніть тільки необхідні поля для оновлення</p>
+      <div class="flex justify-end gap-2">
+        <p-button type="button" label="Відмінити" severity="secondary" (click)="visible_edit_dialog = false"/>
+        <p-button type="submit" [disabled]="!edit_form.valid" label="Зберегти"/>
+      </div>
+    </form>
+  </p-dialog>
+
+  @if (accounts && accounts.length > 0) {
+
+    <p-tree-table [value]="accounts_tree" [columns]="cols" selectionMode="checkbox"
+                  [selectionKeys]="selection_keys"
+                  (selectionKeysChange)="on_selection_change($event)"
+                  dataKey="key" [scrollable]="true" [tableStyle]="{ 'min-width': '50rem' }">
+      <ng-template #header let-columns>
+        <tr>
+          @for (col of columns; track col) {
+            <th [style.width]="col.width">
+              {{ col.header }}
+            </th>
+          }
+        </tr>
+      </ng-template>
+      <ng-template #body let-rowNode let-rowData="rowData" let-columns="columns">
+        <tr [ttRow]="rowNode" [ttSelectableRow]="rowNode">
+          @for (col of columns; let first = $first; track col) {
+            <td [style.width]="col.width">
+              @if (first) {
+                <div class="flex items-center gap-2">
+                  <p-treetable-toggler [rowNode]="rowNode"/>
+                  <p-treetable-checkbox [value]="rowNode"/>
+                  @if (rowData['loading']) {
+                    <p-progress-bar mode="indeterminate" [style]="{ width: '40px', height: '6px' }"/>
+                  }
+                  <span [style.color]="rowData['color']"><b>{{ rowData[col.field] }}</b></span>
+                  @if (rowData['account']) {
+                    <p-button icon="pi pi-pencil" [text]="true" size="small"
+                              (click)="edit_account(rowData['ida'])"/>
+                    <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small"
+                              (click)="delete_account(rowData['ida'])"/>
+                  }
+                </div>
+              } @else {
+                {{ rowData[col.field] }}
+              }
+            </td>
+          }
+        </tr>
+      </ng-template>
+    </p-tree-table>
+
+  }
+</div>
