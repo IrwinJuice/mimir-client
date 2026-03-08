@@ -38,8 +38,8 @@ export class MccService {
   private message = inject(MessageService);
   private http = inject(HttpClient);
 
-  fetch_mcc_by_idu(idu: number): Observable<Mcc[]> {
-    const url = `${environment.apiBase}/users/${idu}/mcc`;
+  fetch_mcc(): Observable<Mcc[]> {
+    const url = `${environment.apiBase}/mcc`;
     return this.http.get<Mcc[]>(url).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.message}`});

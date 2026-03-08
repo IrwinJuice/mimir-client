@@ -2,7 +2,6 @@ import {ChangeDetectorRef, Component, DestroyRef, effect, inject, OnInit} from '
 import {ChartModule} from 'primeng/chart';
 import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
-import {User, UserService} from '../../service/user.service';
 import {of, skip, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
@@ -11,7 +10,6 @@ import {
   TransactionService
 } from '../../service/transaction.service';
 import {
-  AccountService,
   EXCEPTIONS_STORAGE_KEY,
   FILTER_FIELDS,
   NUMBER_OPERATORS,
@@ -22,11 +20,11 @@ import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
 import {AgCharts} from 'ag-charts-angular';
 import {DateTime} from 'luxon';
-import {CHART_COLOR_VARS, get_css_var, ThemeService} from '../../service/theme.service';
+import {get_css_var, ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
-import {AgTooltipRendererResult} from 'ag-charts-enterprise';
+import {AgStandaloneChartOptions, AgTooltipRendererResult} from 'ag-charts-enterprise';
 import {Filter} from '../../components/filter/filter';
 
 @Component({
@@ -49,13 +47,12 @@ import {Filter} from '../../components/filter/filter';
   styleUrl: './bank-transactions.component.scss',
 })
 export class BankTransactionsComponent implements OnInit {
+  private dr = inject(DestroyRef);
+
   private message = inject(MessageService);
   private mcc_service = inject(MccService);
   private dt_service = inject(DateTimeService);
-  protected user_service = inject(UserService);
   protected t_service = inject(TransactionService);
-  private account_service = inject(AccountService);
-  private destroyRef = inject(DestroyRef);
   private theme_service = inject(ThemeService);
   private cd = inject(ChangeDetectorRef);
 
@@ -63,10 +60,9 @@ export class BankTransactionsComponent implements OnInit {
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
 
-  data: any = {labels: [], datasets: []};
+  data = {labels: [], datasets: []};
   options: any = this.create_default_chart_options();
 
-  user: User;
 
   theme_state = this.theme_service.theme_state;
   chart_options = [];
@@ -120,23 +116,23 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   private seed_default_exceptions(): FilterException[] {
-    const mccField = FILTER_FIELDS.find(f => f.value === 'mcc')!;
-    const descField = FILTER_FIELDS.find(f => f.value === 'description')!;
-    const eqNum = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
-    const eqStr = STRING_OPERATORS.find(o => o.value === 'eq')!;
+    const mcc_field = FILTER_FIELDS.find(f => f.value === 'mcc')!;
+    const desc_field = FILTER_FIELDS.find(f => f.value === 'description')!;
+    const eq_num = NUMBER_OPERATORS.find(o => o.value === 'eq')!;
+    const eq_str = STRING_OPERATORS.find(o => o.value === 'eq')!;
     const f: FilterException = {
       combinator: 'AND NOT',
       conditions: [
-        {field: mccField.value, operator: eqNum.value, value: '4829'},
-        {field: descField.value, operator: eqStr.value, value: 'Переказ на картку'},
+        {field: mcc_field.value, operator: eq_num.value, value: '4829'},
+        {field: desc_field.value, operator: eq_str.value, value: 'Переказ на картку'},
       ]
     }
 
     const s: FilterException = {
       combinator: 'AND NOT',
       conditions: [
-        {field: mccField.value, operator: eqNum.value, value: '4829'},
-        {field: descField.value, operator: eqStr.value, value: 'З Білої картки'},
+        {field: mcc_field.value, operator: eq_num.value, value: '4829'},
+        {field: desc_field.value, operator: eq_str.value, value: 'З Білої картки'},
       ]
     }
 
@@ -145,37 +141,26 @@ export class BankTransactionsComponent implements OnInit {
 
   ngOnInit() {
 
-    this.user_service.selected_user$.pipe(
-      skip(1),
-      switchMap((user) => {
-        if (!user) {
-          return of([] as BankTransaction[]);
-        }
-        this.user = user;
-        return this.mcc_service.fetch_mcc_by_idu(user.idu);
-      }),
+
+    this.mcc_service.fetch_mcc().pipe(
       switchMap((mcc_list_or_empty) => {
-        if (!this.user) {
-          return of([] as BankTransaction[]);
-        }
         this.mcc_list = (mcc_list_or_empty as Mcc[]) || [];
 
-        let time_range = this.dt_service.time_range;
+        const time_range = this.dt_service.time_range;
         if (!time_range || time_range.length < 2) {
           this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
           return of([] as BankTransaction[]);
         }
 
-        const toDate: Date = time_range[1];
-        const fromDate: Date = time_range[0];
+        const to_date: Date = time_range[1];
+        const from_date: Date = time_range[0];
 
         // Convert to Unix timestamps (seconds since epoch)
-        const to = Math.floor(toDate.getTime() / 1000);
-        const from = Math.floor(fromDate.getTime() / 1000);
+        const to = Math.floor(to_date.getTime() / 1000);
+        const from = Math.floor(from_date.getTime() / 1000);
         const filter: BankTransactionFilter = {
           external_id_list: [],
           ida_list: [],
-          idu: this.user.idu,
           from,
           to,
           exceptions: this.exceptions,
@@ -187,7 +172,7 @@ export class BankTransactionsComponent implements OnInit {
         this.on_chart_select(this.chart_idx, t_list);
         this.cd.detectChanges();
       }),
-      takeUntilDestroyed(this.destroyRef)
+      takeUntilDestroyed(this.dr)
     ).subscribe();
 
     this.dt_service.time_range$.pipe(
@@ -197,13 +182,13 @@ export class BankTransactionsComponent implements OnInit {
           this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
           return of([] as BankTransaction[]);
         }
-        const toDate: Date = time_range[1];
-        const fromDate: Date = time_range[0];
+        const to_date: Date = time_range[1];
+        const from_date: Date = time_range[0];
         // Convert to Unix timestamps (seconds since epoch)
-        const to = Math.floor(toDate.getTime() / 1000);
-        const from = Math.floor(fromDate.getTime() / 1000);
+        const to = Math.floor(to_date.getTime() / 1000);
+        const from = Math.floor(from_date.getTime() / 1000);
 
-        let filter: BankTransactionFilter = {
+        const filter: BankTransactionFilter = {
           ...this.t_service.last_transactions_filter,
           from,
           to,
@@ -217,14 +202,14 @@ export class BankTransactionsComponent implements OnInit {
         this.on_chart_select(this.chart_idx, t_list);
         this.cd.detectChanges();
       }),
-      takeUntilDestroyed(this.destroyRef)
+      takeUntilDestroyed(this.dr)
     ).subscribe();
 
 
     this.t_service.refill_data_event$.pipe(
       skip(1), // skip event from account.ts on_selection_change()
-      takeUntilDestroyed(this.destroyRef),
-      switchMap((_) => {
+      takeUntilDestroyed(this.dr),
+      switchMap(() => {
         const filter = this.t_service.last_transactions_filter;
         return this.t_service.get_transactions(filter)
       }),
@@ -261,8 +246,8 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   draw_main_chart(t_list: BankTransaction[]) {
-    let data = t_list.map(t => {
-      let amount_key = 'amount_' + t.external_id;
+    const data = t_list.map(t => {
+      const amount_key = 'amount_' + t.external_id;
       return {
         time: DateTime.fromISO(t.transaction_time, {zone: 'utc'}).toJSDate(),
         time_string: this.to_uk_date(t.transaction_time),
@@ -290,10 +275,10 @@ export class BankTransactionsComponent implements OnInit {
         fill: color,
         stroke: color,
         tooltip: {
-          renderer: ({datum}: { datum: any }) => {
+          renderer: ({datum}: { datum: Record<string, unknown> }) => {
             return {
-              title: datum.masked_pan,
-              heading: datum.description,
+              title: datum["masked_pan"],
+              heading: datum["description"],
               data: [
                 {label: "Amount", value: datum["amount_" + external_id]},
                 {label: "Time", value: datum["time_string"]}
@@ -304,7 +289,7 @@ export class BankTransactionsComponent implements OnInit {
       };
     });
 
-    let options = {
+    const options = {
       theme: "ag-default",
       background: {
         visible: false
@@ -365,11 +350,11 @@ export class BankTransactionsComponent implements OnInit {
       })
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    const isDark = this.theme_state().darkTheme;
-    const outcomeColor = get_css_var('--p-red-500');
-    const incomeColor = get_css_var('--p-green-500');
-    const options = {
-      theme: isDark ? 'ag-default-dark' : 'ag-default',
+    const is_dark = this.theme_state().darkTheme;
+    const outcome_color = get_css_var('--p-red-500');
+    const income_color = get_css_var('--p-green-500');
+    this.options = {
+      theme: is_dark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
 
@@ -379,23 +364,21 @@ export class BankTransactionsComponent implements OnInit {
           xKey: 'month',
           yKey: 'outcome',
           yName: 'Витрати (UAH)',
-          fill: outcomeColor,
+          fill: outcome_color,
         },
         {
           type: 'bar',
           xKey: 'month',
           yKey: 'income',
           yName: 'Дохід (UAH)',
-          fill: incomeColor,
+          fill: income_color,
         },
       ],
-      axes: {
-        x: {type: 'category', position: 'bottom', label: {autoRotate: true}},
-        y: {type: 'number', position: 'left'},
-      },
+      // axes: {
+      //   x: {type: 'category', position: 'bottom', label: {autoRotate: true}},
+      //   y: {type: 'number', position: 'left'},
+      // },
     };
-
-    this.options = options;
     this.cd.detectChanges();
   }
 
@@ -422,16 +405,14 @@ export class BankTransactionsComponent implements OnInit {
       .filter((o) => o.outcome !== 0)
       .sort((a, b) => a.mcc_d.localeCompare(b.mcc_d));
 
-    const isDark = this.theme_state().darkTheme;
+    const is_dark = this.theme_state().darkTheme;
     const fills = this.theme_service.get_chart_fills();
-    const options = {
-      theme: isDark ? 'ag-default-dark' : 'ag-default',
+    this.options = {
+      theme: is_dark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
       series: [{type: 'pie', angleKey: 'outcome', legendItemKey: 'label', fills}],
     };
-
-    this.options = options;
     this.cd.detectChanges();
   }
 
@@ -459,16 +440,14 @@ export class BankTransactionsComponent implements OnInit {
       .filter((i) => i.income !== 0)
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    const isDark = this.theme_state().darkTheme;
+    const is_dark = this.theme_state().darkTheme;
     const fills = this.theme_service.get_chart_fills();
-    const options = {
-      theme: isDark ? 'ag-default-dark' : 'ag-default',
+    this.options = {
+      theme: is_dark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
       series: [{type: 'pie', angleKey: 'income', legendItemKey: 'label', fills}],
     };
-
-    this.options = options;
     this.cd.detectChanges();
   }
 

@@ -1,4 +1,4 @@
-import {ChangeDetectorRef, Component, DestroyRef, inject, Input, OnInit} from '@angular/core';
+import {ChangeDetectorRef, Component, DestroyRef, inject, OnInit} from '@angular/core';
 import {FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Button} from 'primeng/button';
 import {Dialog} from 'primeng/dialog';
@@ -13,9 +13,8 @@ import {
   AccountService,
   CreateAccount
 } from '../../service/account.service';
-import {finalize, map, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
-import {MessageService, TreeNode, TreeTableNode} from 'primeng/api';
-import {User} from '../../service/user.service';
+import {finalize, mergeMap, NEVER, Observable, switchMap, take, tap} from 'rxjs';
+import {MessageService, TreeNode} from 'primeng/api';
 import {TreeTableModule} from 'primeng/treetable';
 import {DateTime} from 'luxon';
 import * as cc from 'currency-codes';
@@ -32,7 +31,7 @@ interface Column {
 }
 
 @Component({
-  selector: 'app-account',
+  selector: 'app-accounts',
   imports: [
     ReactiveFormsModule,
     Button,
@@ -44,109 +43,70 @@ interface Column {
     TreeTableModule,
     ProgressBar,
   ],
-  templateUrl: './account.html',
-  styleUrl: './account.scss',
+  templateUrl: './accounts.html',
+  styleUrl: './accounts.scss',
 })
-export class Account implements OnInit {
-
-  @Input({required: true})
-  public user: User;
+export class Accounts implements OnInit {
 
   loading = false;
 
-  private formBuilder = inject(FormBuilder);
+  private dr = inject(DestroyRef);
+
+  private fb = inject(FormBuilder);
   protected account_service = inject(AccountService);
   protected theme_service = inject(ThemeService);
   private dt_service = inject(DateTimeService);
   private message = inject(MessageService);
-  private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
   private t_service = inject(TransactionService);
 
   protected readonly account_kinds: AccountKind[] = [AccountKind.MONO];
   protected visible_account_dialog = false;
-  protected accountForm = this.formBuilder.nonNullable.group({
+  protected visible_edit_dialog = false;
+  protected editing_ida: number | null = null;
+  protected account_form = this.fb.nonNullable.group({
     account_kind: [AccountKind.MONO, Validators.required],
     account_token: ['', Validators.required],
+    account_name: ['', Validators.required],
+  });
+  protected edit_form = this.fb.nonNullable.group({
+    edit_name: [''],
+    edit_token: [''],
   });
 
 
   protected accounts$: Observable<BankAccount[]> = this.account_service.accounts$;
   protected monitors: AccountMonitor[] = [];
 
-  accountsTree: TreeNode[] = [];
-  selectionKeys: any = {};
+  accounts_tree: TreeNode[] = [];
+  selection_keys: Record<string, {checked: boolean}> = {};
   cols!: Column[];
 
   ngOnInit(): void {
 
     this.cols = [
-      {field: 'kind', header: 'Аккаунт', width: '250px'},
+      {field: 'name', header: 'Аккаунт', width: '300px'},
       {field: 'balance', header: 'Баланс', width: '150px'},
       {field: 'last_taken_date', header: 'З', width: '100px'},
       {field: 'updated_at', header: 'По', width: '100px'},
       {field: 'iban', header: 'IBAN', width: '250px'},
     ];
 
+    this.fetch_accounts();
 
-    this.account_service.get_accounts_by_idu(this.user.idu).pipe(
-      take(1),
-      switchMap((accounts) => {
-        this.account_service.accounts = accounts;
-        accounts.forEach((a) => {
-          // include ida in the node data so later lookups (by data.ida) work
-          this.accountsTree.push({
-            key: `account-${a.ida}`,
-            data: {kind: a.kind, ida: a.ida},
-            children: []
-          });
-          this.selectionKeys[`account-${a.ida}`] = {
-            checked: true
-          }
-        });
-        return this.account_service.get_account_monitors(this.user.idu);
-      }),
-      tap((monitors) => {
-        this.monitors = monitors || [];
-        this.monitors.forEach((m) => {
-          const parent = this.accountsTree.find(n => n.key === `account-${m.ida}`);
-          if (parent) {
-            parent.children!.push({
-              key: `monitor-${m.ida}-${m.external_id}`,
-              data: {
-                // include ida and external_id for reliable future lookups
-                ida: m.ida,
-                iban: m.iban,
-                external_id: m.external_id,
-                color: this.theme_service.resolve_monitor_color(m.external_id),
-                kind: m.masked_pan,
-                loading: m.status === AccountMonitorStatus.PENDING,
-                balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-              },
-              leaf: true
-            });
-            parent.expanded = true;
-          }
-          this.selectionKeys[`monitor-${m.ida}-${m.external_id}`] = {
-            checked: true
-          }
-        });
+    this.subscribe_monito_status();
 
-        this.accountsTree = [...this.accountsTree];
-        this.cdr.detectChanges();
-      })
-    ).subscribe();
+  }
 
+  private subscribe_monito_status() {
     this.account_service.monitor_status$
       .pipe(
-        takeUntilDestroyed(this.destroyRef),
+        takeUntilDestroyed(this.dr),
         mergeMap((notification) => {
-          let account = this.accountsTree.find((node) => node.data.ida === notification.ida);
+          const account = this.accounts_tree.find((node) => node.data.ida === notification.ida);
           if (account) {
-            let monitor = account.children.find((node) => node.data.external_id === notification.external_id);
-            return this.account_service.get_account_monitor(this.user.idu, monitor.data.external_id).pipe(
+            const monitor = account.children.find((node) => node.data.external_id === notification.external_id);
+            return this.account_service.get_account_monitor(monitor.data.external_id).pipe(
               tap((m) => {
                 monitor.data = {
                   ida: m.ida,
@@ -159,7 +119,7 @@ export class Account implements OnInit {
                   updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
                   last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
                 };
-                this.accountsTree = [...this.accountsTree];
+                this.accounts_tree = [...this.accounts_tree];
                 this.cdr.detectChanges();
               })
             );
@@ -169,17 +129,67 @@ export class Account implements OnInit {
         }),
       )
       .subscribe();
-
   }
 
-  on_selection_change(keys: any): void {
-    this.selectionKeys = keys;
+  private fetch_accounts() {
+    this.account_service.get_accounts().pipe(
+      switchMap((accounts) => {
+        this.account_service.accounts = accounts;
+        accounts.forEach((a) => {
+          // include ida in the node data so later lookups (by data.ida) work
+          this.accounts_tree.push({
+            key: `account-${a.ida}`,
+            data: {account: true, name: `${a.name}`, ida: a.ida},
+            children: []
+          });
+          this.selection_keys[`account-${a.ida}`] = {
+            checked: true
+          }
+        });
+        return this.account_service.get_accounts_monitors();
+      }),
+      tap((monitors) => {
+        this.monitors = monitors || [];
+        this.monitors.forEach((m) => {
+          const parent = this.accounts_tree.find(n => n.key === `account-${m.ida}`);
+          if (parent) {
+            parent.children!.push({
+              key: `monitor-${m.ida}-${m.external_id}`,
+              data: {
+                // include ida and external_id for reliable future lookups
+                ida: m.ida,
+                iban: m.iban,
+                external_id: m.external_id,
+                color: this.theme_service.resolve_monitor_color(m.external_id),
+                name: m.masked_pan,
+                loading: m.status === AccountMonitorStatus.PENDING,
+                balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
+                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+              },
+              leaf: true
+            });
+            parent.expanded = true;
+          }
+          this.selection_keys[`monitor-${m.ida}-${m.external_id}`] = {
+            checked: true
+          }
+        });
+
+        this.accounts_tree = [...this.accounts_tree];
+        this.cdr.detectChanges();
+      })
+    ).subscribe();
+  }
+
+  on_selection_change(keys: Record<string, {checked: boolean}>): void {
+    this.selection_keys = keys;
 
     const ida_list: number[] = [];
     const external_id_list: string[] = [];
 
     for (const [key, val] of Object.entries(keys)) {
-      if (!(val as any)?.checked) continue;
+      if (!(val)?.checked) continue;
 
       if (key.startsWith('account-')) {
         // key = 'account-1' → ida = 1
@@ -188,10 +198,10 @@ export class Account implements OnInit {
       } else if (key.startsWith('monitor-')) {
         // key = 'monitor-1-Vb2IecNJleJpaf68itjujQ' → external_id = 'Vb2IecNJleJpaf68itjujQ'
         // format: monitor-{ida}-{external_id}  where external_id may contain '-'
-        const withoutPrefix = key.slice('monitor-'.length);          // '1-Vb2IecNJleJpaf68itjujQ'
-        const firstDash = withoutPrefix.indexOf('-');
-        if (firstDash !== -1) {
-          const external_id = withoutPrefix.slice(firstDash + 1);    // 'Vb2IecNJleJpaf68itjujQ'
+        const without_prefix = key.slice('monitor-'.length);          // '1-Vb2IecNJleJpaf68itjujQ'
+        const first_dash = without_prefix.indexOf('-');
+        if (first_dash !== -1) {
+          const external_id = without_prefix.slice(first_dash + 1);    // 'Vb2IecNJleJpaf68itjujQ'
           external_id_list.push(external_id);
         }
       }
@@ -210,28 +220,28 @@ export class Account implements OnInit {
   }
 
   delete_account(ida: number): void {
-    this.account_service.delete_account(this.user.idu, ida).pipe(
+    this.account_service.delete_account(ida).pipe(
       take(1),
       tap(() => {
-        this.accountsTree = this.accountsTree.filter(n => n.data.ida !== ida);
+        this.accounts_tree = this.accounts_tree.filter(n => n.data.ida !== ida);
         this.account_service.accounts = this.account_service.accounts.filter(a => a.ida !== ida);
         // clean up selection keys for this account and its monitors
-        Object.keys(this.selectionKeys)
+        Object.keys(this.selection_keys)
           .filter(k => k === `account-${ida}` || k.startsWith(`monitor-${ida}-`))
-          .forEach(k => delete this.selectionKeys[k]);
+          .forEach(k => delete this.selection_keys[k]);
         this.message.add({severity: 'info', summary: 'Account', detail: 'Акаунт видалено.'});
-        this.on_selection_change({...this.selectionKeys});
+        this.on_selection_change({...this.selection_keys});
         this.cdr.detectChanges();
       })
     ).subscribe();
   }
 
   add_account() {
-    if (this.accountForm.valid) {
+    if (this.account_form.valid) {
       const account: CreateAccount = {
-        kind: this.accountForm.controls.account_kind.value,
-        token: this.accountForm.controls.account_token.value,
-        idu: this.user.idu,
+        kind: this.account_form.controls.account_kind.value,
+        token: this.account_form.controls.account_token.value,
+        name: this.account_form.controls.account_name.value,
       };
 
       this.account_service.add_account(account).pipe(
@@ -239,12 +249,12 @@ export class Account implements OnInit {
         tap((account) => {
           this.account_service.accounts = [...this.account_service.accounts, account]
           // include ida in node data
-          this.accountsTree.push({
+          this.accounts_tree.push({
             key: `account-${account.ida}`,
             data: {kind: account.kind, ida: account.ida},
             children: []
           });
-          this.selectionKeys[`account-${account.ida}`] = {
+          this.selection_keys[`account-${account.ida}`] = {
             checked: true
           }
           this.message.add({severity: 'info', summary: 'Account', detail: 'Успішно додано.'});
@@ -257,7 +267,7 @@ export class Account implements OnInit {
   // Use date-picker rangeDates to call stats endpoint
   fetch_stats() {
     this.loading = true;
-    let time_range = this.dt_service.time_range;
+    const time_range = this.dt_service.time_range;
     if (!time_range || time_range.length < 2) {
       this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
       this.loading = false;
@@ -265,30 +275,29 @@ export class Account implements OnInit {
     }
 
     // rangeDates is [start, end] — convert to ISO strings (strip timezone if needed)
-    const toDate: Date = time_range[1];
-    const fromDate: Date = time_range[0];
+    const to_date: Date = time_range[1];
+    const from_date: Date = time_range[0];
 
     // Convert to Unix timestamps (seconds since epoch)
-    const to = Math.floor(toDate.getTime() / 1000);
-    const from = Math.floor(fromDate.getTime() / 1000);
+    const to = Math.floor(to_date.getTime() / 1000);
+    const from = Math.floor(from_date.getTime() / 1000);
 
     // from should be < to
-    this.account_service.update_accounts_stat(this.user.idu, from, to).pipe(
-      take(1),
+    this.account_service.update_accounts_stat(from, to).pipe(
       tap((result) => {
         if (result) {
           console.log('accounts stats:', result);
           this.monitors = result;
 
           // Build a new accountsTree immutably so change detection picks up child changes
-          const newTree = this.accountsTree.map(acc => {
+          const new_tree = this.accounts_tree.map(acc => {
             // prefer acc.data.ida but fall back to parsing from key if needed
-            const accId = acc?.data?.ida ?? (() => {
+            const acc_id = acc?.data?.ida ?? (() => {
               const parts = (acc.key || '').split('-');
               return parts.length > 1 ? Number(parts[1]) : undefined;
             })();
 
-            const children = (result as AccountMonitor[]).filter(m => m.ida === accId).map(m => ({
+            const children = (result as AccountMonitor[]).filter(m => m.ida === acc_id).map(m => ({
               key: `monitor-${m.ida}-${m.external_id}`,
               data: {
                 ida: m.ida,
@@ -303,12 +312,12 @@ export class Account implements OnInit {
             }));
 
             // update selection keys for the monitors of this account
-            children.forEach(ch => this.selectionKeys[ch.key] = {checked: true});
+            children.forEach(ch => this.selection_keys[ch.key] = {checked: true});
             acc.expanded = true;
             return {...acc, children} as TreeNode;
           });
 
-          this.accountsTree = newTree;
+          this.accounts_tree = new_tree;
 
         } else {
           this.message.add({severity: 'warn', summary: 'Stats', detail: 'No data returned.'});
@@ -321,4 +330,31 @@ export class Account implements OnInit {
     ).subscribe();
   }
 
+  edit_account(ida: number): void {
+    const account = this.account_service.accounts.find(a => a.ida === ida);
+    if (!account) return;
+    this.editing_ida = ida;
+    this.edit_form.setValue({edit_name: account.name, edit_token: ''});
+    this.visible_edit_dialog = true;
+  }
+
+  save_edit_account(): void {
+    if (!this.edit_form.valid || this.editing_ida == null) return;
+    const {edit_name, edit_token} = this.edit_form.getRawValue();
+    this.account_service.update_account(this.editing_ida, edit_name, edit_token).pipe(
+      take(1),
+      tap((updated) => {
+        this.account_service.accounts = this.account_service.accounts.map(a =>
+          a.ida === updated.ida ? updated : a
+        );
+        const node = this.accounts_tree.find(n => n.data.ida === updated.ida);
+        if (node) node.data = {...node.data, name: updated.name};
+        this.accounts_tree = [...this.accounts_tree];
+        this.message.add({severity: 'success', summary: 'Account', detail: 'Аккаунт оновлено.'});
+        this.visible_edit_dialog = false;
+        this.editing_ida = null;
+        this.cdr.detectChanges();
+      })
+    ).subscribe();
+  }
 }

@@ -31,7 +31,7 @@ export class WebSocketService {
     });
   }
 
-  sendMessage(message: string) {
+  send_message(message: string) {
     if (this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(message);
     }
