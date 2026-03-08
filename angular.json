@@ -10,7 +10,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "transactions-client": {
+    "mimir-client": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -78,10 +78,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "transactions-client:build:production"
+              "buildTarget": "mimir-client:build:production"
             },
             "development": {
-              "buildTarget": "transactions-client:build:development"
+              "buildTarget": "mimir-client:build:development"
             }
           },
           "defaultConfiguration": "development"
