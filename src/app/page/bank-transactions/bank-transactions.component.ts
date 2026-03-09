@@ -76,7 +76,8 @@ export class BankTransactionsComponent implements OnInit {
       {name: 'Загальна', chart_idx: 1},
       {name: 'Дохід та витрати', chart_idx: 2},
       {name: 'MCC Витрати', chart_idx: 3},
-      {name: 'MCC Дохід', chart_idx: 4}
+      {name: 'MCC-G Витрати', chart_idx: 4},
+      {name: 'MCC Дохід', chart_idx: 5},
     ];
 
     this.exceptions = this.restore_exceptions_from_storage();
@@ -239,6 +240,9 @@ export class BankTransactionsComponent implements OnInit {
         this.draw_mcc_outcome(t_list)
         break;
       case 4:
+        this.draw_mcc_group_outcome(t_list)
+        break;
+      case 5:
         this.draw_mcc_income(t_list)
         break;
     }
@@ -374,13 +378,53 @@ export class BankTransactionsComponent implements OnInit {
           fill: income_color,
         },
       ],
-      // axes: {
-      //   x: {type: 'category', position: 'bottom', label: {autoRotate: true}},
-      //   y: {type: 'number', position: 'left'},
-      // },
     };
     this.cd.detectChanges();
   }
+
+  draw_mcc_group_outcome(t_list: BankTransaction[]) {
+    const with_mcc_group = t_list.map((t) => {
+      const mcc_group = this.mcc_list[t.mcc].group;
+      return {
+        ...t,
+        mcc_group
+      }
+    })
+
+
+    // Group transactions by MCC
+    const groups = Object.groupBy(
+      with_mcc_group,
+      (t) => t.mcc_group.type
+    );
+
+
+    // Sum positive amounts (income) per month
+    const data = Object.entries(groups)
+      .map(([mcc, items]) => {
+        const outcome = (items ?? [])
+          .filter(t => t.amount < 0)
+          .reduce((sum, t) => sum + t.amount, 0);
+        return {
+          mcc_d: items[0].mcc_group.description.uk,
+          label: `${mcc}:${items[0].mcc_group.description.uk}`,
+          outcome: Math.abs(outcome) / 100,  // positive value, UAH
+        };
+      })
+      .filter((o) => o.outcome !== 0)
+      .sort((a, b) => a.mcc_d.localeCompare(b.mcc_d));
+
+    const is_dark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    this.options = {
+      theme: is_dark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'donut', angleKey: 'outcome', calloutLabelKey: 'label', fills}],
+    };
+    this.cd.detectChanges();
+  }
+
 
   draw_mcc_outcome(t_list: BankTransaction[]) {
     // Group transactions by MCC
@@ -390,7 +434,7 @@ export class BankTransactionsComponent implements OnInit {
     );
 
 
-    // Sum positive amounts (income) per month
+    // Sum negative amounts (outcome) per month
     const data = Object.entries(groups)
       .map(([mcc, items]) => {
         const outcome = (items ?? [])
@@ -411,7 +455,7 @@ export class BankTransactionsComponent implements OnInit {
       theme: is_dark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
-      series: [{type: 'pie', angleKey: 'outcome', legendItemKey: 'label', fills}],
+      series: [{type: 'donut', angleKey: 'outcome', calloutLabelKey: 'label', fills}],
     };
     this.cd.detectChanges();
   }
@@ -446,7 +490,8 @@ export class BankTransactionsComponent implements OnInit {
       theme: is_dark ? 'ag-default-dark' : 'ag-default',
       background: {visible: false},
       data,
-      series: [{type: 'pie', angleKey: 'income', legendItemKey: 'label', fills}],
+      // series: [{type: 'pie', angleKey: 'income', legendItemKey: 'label', fills}],
+      series: [{type: 'donut', angleKey: 'income', calloutLabelKey: 'label', fills}],
     };
     this.cd.detectChanges();
   }
