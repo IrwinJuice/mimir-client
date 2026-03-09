@@ -1,5 +1,5 @@
 import {Component, inject, OnInit} from '@angular/core';
-import {RouterOutlet} from '@angular/router';
+import {RouterLink, RouterOutlet} from '@angular/router';
 import {Toast} from 'primeng/toast';
 import {FormsModule, ReactiveFormsModule} from '@angular/forms';
 import {ThemeSwitcher} from './themeswitcher';
@@ -15,7 +15,7 @@ import {TransactionService} from './service/transaction.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, Toast, FormsModule, ThemeSwitcher, ReactiveFormsModule, Menubar, DatePicker, Sidebar],
+  imports: [RouterOutlet, Toast, FormsModule, ThemeSwitcher, ReactiveFormsModule, Menubar, DatePicker, Sidebar, RouterLink],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

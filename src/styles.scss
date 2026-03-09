@@ -19,6 +19,9 @@ html {
   --border-color: var(--p-surface-200);
   --text-color: var(--p-surface-700);
   --overlay-background: #ffffff;
+  --logo-background: #444444;
+  --logo-gradient-start: #90A4AE;
+  --logo-gradient-end: #FF9800;
 }
 
 :root[class='p-dark'] {
@@ -29,6 +32,9 @@ html {
   --border-color: rgba(255, 255, 255, 0.1);
   --text-color: var(--p-surface-0);
   --overlay-background: var(--p-surface-900);
+  --logo-background: #ffffff;
+  --logo-gradient-start: #CFD8DC;
+  --logo-gradient-end: #FF9800;
 }
 
 body {

@@ -1,5 +1,6 @@
 <p-menubar class="mb-4" [model]="items">
   <ng-template #start>
+    <a class="logo" routerLink="/"><img src="../assets/icons/coins-48.png" alt="">Mimir analytics</a>
     <p-date-picker [(ngModel)]="range_dates" (ngModelChange)="on_range_change($event)" selectionMode="range"
                    [readonlyInput]="true"/>
 
