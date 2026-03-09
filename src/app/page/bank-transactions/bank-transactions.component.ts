@@ -26,6 +26,7 @@ import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
 import {AgStandaloneChartOptions, AgTooltipRendererResult} from 'ag-charts-enterprise';
 import {Filter} from '../../components/filter/filter';
+import {Chip} from 'primeng/chip';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -42,6 +43,7 @@ import {Filter} from '../../components/filter/filter';
     TableModule,
     SelectButton,
     Filter,
+    Chip,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',

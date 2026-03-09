@@ -35,6 +35,7 @@
               <th>T. time</th>
               <th>Receipt ID</th>
               <th>Bank Acc. ID</th>
+              <th>Tags</th>
             </tr>
           </ng-template>
           <ng-template #body let-transaction>
@@ -50,6 +51,7 @@
               <td>{{ to_uk_date(transaction.transaction_time) }}</td>
               <td>{{ transaction.receipt_id }}</td>
               <td>{{ transaction.external_id }}</td>
+              <td> <p-chip [label]="transaction.tag" /> </td>
             </tr>
           </ng-template>
         </p-table>
