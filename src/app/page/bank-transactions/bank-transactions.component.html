@@ -15,43 +15,67 @@
                    [options]="options"></ag-charts>
       </p-tabpanel>
       <p-tabpanel value="1">
+        <div class="flex flex-wrap gap-2 mb-2 items-center">
+          @for (tag of tags; track tag) {
+            <p-toggleButton
+              [(ngModel)]="selected_tag_map[tag.tag]"
+              [onLabel]="tag.tag"
+              [offLabel]="tag.tag"
+              [style]="tag_toggle_style(tag.severity)"
+              size="small"/>
+          }
+        </div>
         <p-table [value]="transactions"
                  [tableStyle]="{ 'min-width': '150rem' } "
                  [paginator]="true"
                  [showCurrentPageReport]="true"
                  currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
                  [rows]="10"
-                 [rowsPerPageOptions]="[10, 50, 100, 200]">
+                 [rowsPerPageOptions]="[10, 50, 100, 200]"
+                 paginatorDropdownAppendTo="body"
+                 selectionMode="multiple"
+                 [(selection)]="selected_transactions"
+                 dataKey="id">
           <ng-template #header>
             <tr>
+              <th style="width: 3rem">
+                <p-tableHeaderCheckbox/>
+              </th>
               <th>Mask</th>
               <th>Amount</th>
               <th>Currency</th>
               <th>Description</th>
               <th>MCC</th>
               <th>MCC Description</th>
+              <th>Tags</th>
+              <th>T. time</th>
               <th>Balance</th>
               <th>Hold</th>
-              <th>T. time</th>
               <th>Receipt ID</th>
               <th>Bank Acc. ID</th>
-              <th>Tags</th>
             </tr>
           </ng-template>
           <ng-template #body let-transaction>
-            <tr>
+            <tr [pSelectableRow]="transaction">
+              <td>
+                <p-tableCheckbox [value]="transaction"/>
+              </td>
               <td>{{ transaction.masked_pan }}</td>
               <td>{{ transaction.amount / 100 }}</td>
               <td>{{ transaction.currency }}</td>
               <td>{{ transaction.description }}</td>
               <td>{{ transaction.mcc }}</td>
               <td>{{ transaction.mcc_description }}</td>
+              <td >
+                @for (tag of transaction.tags; track tag) {
+                  <p-tag [severity]="$any(tag.severity)" [value]="tag.tag"/>
+                }
+              </td>
+              <td>{{ to_uk_date(transaction.transaction_time) }}</td>
               <td>{{ transaction.balance }}</td>
               <td>{{ transaction.hold }}</td>
-              <td>{{ to_uk_date(transaction.transaction_time) }}</td>
               <td>{{ transaction.receipt_id }}</td>
               <td>{{ transaction.external_id }}</td>
-              <td> <p-chip [label]="transaction.tag" /> </td>
             </tr>
           </ng-template>
         </p-table>

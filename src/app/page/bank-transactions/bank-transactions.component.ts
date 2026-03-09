@@ -7,7 +7,8 @@ import {
   BankTransaction,
   BankTransactionFilter,
   FilterException,
-  TransactionService
+  TransactionService,
+  TransactionTag
 } from '../../service/transaction.service';
 import {
   EXCEPTIONS_STORAGE_KEY,
@@ -24,9 +25,10 @@ import {get_css_var, ThemeService} from '../../service/theme.service';
 import {Tab, TabList, TabPanel, TabPanels, Tabs} from 'primeng/tabs';
 import {TableModule} from 'primeng/table';
 import {SelectButton} from 'primeng/selectbutton';
-import {AgStandaloneChartOptions, AgTooltipRendererResult} from 'ag-charts-enterprise';
+import {AgTooltipRendererResult} from 'ag-charts-enterprise';
 import {Filter} from '../../components/filter/filter';
-import {Chip} from 'primeng/chip';
+import {Tag} from 'primeng/tag';
+import {ToggleButton} from 'primeng/togglebutton';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -43,7 +45,8 @@ import {Chip} from 'primeng/chip';
     TableModule,
     SelectButton,
     Filter,
-    Chip,
+    Tag,
+    ToggleButton,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -61,6 +64,34 @@ export class BankTransactionsComponent implements OnInit {
 
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
+  tags = new Set<TransactionTag>();
+  selected_transactions: BankTransaction[] = [];
+  protected selected_tag_map: Record<string, boolean> = {};
+
+  // Maps a PrimeNG tag severity to togglebutton design-token overrides.
+  // Checked (on)  → full severity colour.
+  // Unchecked (off) → secondary / muted.
+  protected tag_toggle_style(severity: string): Record<string, string> {
+    const bg = `var(--p-tag-${severity}-background)`;
+    const fg = `var(--p-tag-${severity}-color)`;
+    return {
+
+      '--p-togglebutton-font-weight': 'bold',
+
+
+      '--p-togglebutton-checked-background': 'inherited',
+      '--p-togglebutton-checked-hover-background': bg,
+      '--p-togglebutton-checked-color': fg,
+      '--p-togglebutton-checked-border-color': 'inherited',// bg,
+      '--p-togglebutton-content-checked-background': bg,
+
+      '--p-togglebutton-background': 'inherited',//'var(--p-tag-secondary-background)',
+      '--p-togglebutton-hover-background': 'var(--p-tag-secondary-background)',
+      '--p-togglebutton-color': 'var(--p-tag-secondary-color)',
+      '--p-togglebutton-border-color': 'inherited',//'var(--p-tag-secondary-background)',
+      '--p-togglebutton-content-background': 'var(--p-tag-secondary-background)',
+    };
+  }
 
   data = {labels: [], datasets: []};
   options: any = this.create_default_chart_options();
@@ -71,7 +102,6 @@ export class BankTransactionsComponent implements OnInit {
   chart_idx = 1;
 
   exceptions: FilterException[] = [];
-
 
   constructor() {
     this.chart_options = [
@@ -171,9 +201,7 @@ export class BankTransactionsComponent implements OnInit {
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
-        this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx, t_list);
-        this.cd.detectChanges();
+        this.refill_transactions(t_list);
       }),
       takeUntilDestroyed(this.dr)
     ).subscribe();
@@ -201,9 +229,7 @@ export class BankTransactionsComponent implements OnInit {
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
-        this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx, t_list);
-        this.cd.detectChanges();
+        this.refill_transactions(t_list);
       }),
       takeUntilDestroyed(this.dr)
     ).subscribe();
@@ -217,9 +243,7 @@ export class BankTransactionsComponent implements OnInit {
         return this.t_service.get_transactions(filter)
       }),
       tap((t_list) => {
-        this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx, t_list);
-        this.cd.detectChanges();
+        this.refill_transactions(t_list);
       }),
     ).subscribe();
 
@@ -510,10 +534,23 @@ export class BankTransactionsComponent implements OnInit {
     this.t_service.get_transactions(filter).pipe(
       take(1),
       tap((t_list) => {
-        this.transactions = t_list || [];
-        this.on_chart_select(this.chart_idx, t_list);
-        this.cd.detectChanges();
+        this.refill_transactions(t_list);
       }),
     ).subscribe();
+  }
+
+  private refill_transactions(t_list: BankTransaction[]) {
+    this.transactions = t_list || [];
+    this.tags.clear();
+    t_list.forEach((t) =>
+      t.tags.forEach((tag) => {
+        this.tags.add(tag);
+        if (!(tag.tag in this.selected_tag_map)) {
+          this.selected_tag_map[tag.tag] = true;
+        }
+      })
+    );
+    this.on_chart_select(this.chart_idx, t_list);
+    this.cd.detectChanges();
   }
 }

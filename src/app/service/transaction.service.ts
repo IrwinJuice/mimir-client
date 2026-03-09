@@ -20,8 +20,15 @@ export interface BankTransaction {
   receipt_id: string | null,
   balance: number | null,
 
+  tags: TransactionTag[]
 }
 
+/// A single tag.
+/// Severity values: primary | secondary | success | info | warn | danger | contrast
+export interface TransactionTag {
+  tag: string,
+  severity: string,
+}
 export interface FilterCondition {
   field: string;      // 'amount' | 'currency' | 'description' | 'receipt_id' | 'mcc'
   operator: string;   // 'eq' | 'neq' | 'lt' | 'gt' | 'lte' | 'gte' | 'startsWith' | 'endsWith' | 'contains'
@@ -166,4 +173,5 @@ export class TransactionService {
       URL.revokeObjectURL(url);
     });
   }
+
 }
