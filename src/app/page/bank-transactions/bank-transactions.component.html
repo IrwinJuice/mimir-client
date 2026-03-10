@@ -16,7 +16,7 @@
       </p-tabpanel>
       <p-tabpanel value="1">
         <div class="flex flex-wrap gap-2 mb-2 items-center">
-          <p-button  size="small" pTooltip="Додати тег" [rounded]="true" [outlined]="true" icon="pi pi-plus" />
+          <p-button  size="small" pTooltip="Додати тег" [rounded]="true" [outlined]="true" icon="pi pi-plus" (onClick)="open_add_tag_dialog()" />
           <p-button  size="small" pTooltip="Видалити тег" [rounded]="true" [outlined]="true" severity="danger" icon="pi pi-trash" />
           @for (tag of tags; track tag) {
             <p-toggleButton
@@ -38,7 +38,7 @@
                  paginatorDropdownAppendTo="body"
                  selectionMode="multiple"
                  [(selection)]="selected_transactions"
-                 dataKey="id">
+                 dataKey="idt">
           <ng-template #header>
             <tr>
               <th style="width: 3rem">
@@ -86,3 +86,80 @@
     </p-tabpanels>
   </p-tabs>
 </div>
+
+<p-dialog
+  header="Додати теги до вибраних транзакцій"
+  [(visible)]="show_add_tag_dialog"
+  [modal]="true"
+  [style]="{ width: '520px' }"
+  [draggable]="false"
+  [resizable]="false">
+
+  <form [formGroup]="batch_tag_form" (ngSubmit)="submit_add_tag()" class="flex flex-col gap-3 pt-2">
+
+    <div formArrayName="rows" class="flex flex-col gap-2">
+      @for (row of tag_rows.controls; track $index) {
+        <div [formGroupName]="$index" class="flex gap-2 items-start">
+
+          <div class="flex flex-col gap-1 flex-1">
+            <input
+              pInputText
+              formControlName="tag"
+              placeholder="Назва тегу"
+              class="w-full"
+            />
+            @if (row.get('tag')?.invalid && row.get('tag')?.touched) {
+              <small class="text-red-500">Введіть назву тегу</small>
+            }
+          </div>
+
+          <p-select
+            formControlName="severity"
+            [options]="severity_options"
+            optionLabel="label"
+            optionValue="value"
+            appendTo="body"
+            placeholder="Серйозність"
+            class="w-40"
+          />
+
+          <p-button
+            icon="pi pi-trash"
+            severity="danger"
+            [outlined]="true"
+            [rounded]="true"
+            size="small"
+            type="button"
+            [disabled]="tag_rows.length === 1"
+            (onClick)="remove_tag_row($index)" />
+        </div>
+      }
+    </div>
+
+    <div>
+      <p-button
+        icon="pi pi-plus"
+        label="Ще рядок"
+        severity="secondary"
+        [outlined]="true"
+        size="small"
+        type="button"
+        (onClick)="add_tag_row()" />
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <p-button
+        label="Скасувати"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="show_add_tag_dialog = false" />
+      <p-button
+        label="Додати"
+        type="submit"
+        [disabled]="batch_tag_form.invalid" />
+    </div>
+
+  </form>
+</p-dialog>
+

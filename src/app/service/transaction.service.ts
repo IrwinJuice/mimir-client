@@ -7,7 +7,7 @@ import {environment} from '../../environments/environment';
 export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
 
 export interface BankTransaction {
-  id: string,
+  idt: string,
   external_id: string,
   ida: number,
   amount: number,
@@ -86,7 +86,7 @@ export class TransactionService {
     return this.http.post<BankTransaction[]>(url, filter).pipe(
       tap((ts) => this.current_transactions = ts),
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of([] as BankTransaction[]);
       })
     );
@@ -98,7 +98,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/transactions/csv`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     ).subscribe(response => {
@@ -128,7 +128,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/transactions/xlsx`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     ).subscribe(response => {
@@ -158,7 +158,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/transactions/json`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     ).subscribe(response => {
@@ -186,7 +186,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/tags`;
     return this.http.get<TransactionTag[]>(url).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     );
@@ -196,7 +196,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/tags/batch_insert`;
     return this.http.post<BankTransactionTag[]>(url, tags).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of([]);
       }));
   }
@@ -205,7 +205,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/tags/batch_delete`;
     return this.http.post<BankTransactionTag[]>(url, tags).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of([]);
       }));
   }

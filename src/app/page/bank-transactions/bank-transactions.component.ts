@@ -1,6 +1,6 @@
 import {ChangeDetectorRef, Component, DestroyRef, effect, inject, OnInit} from '@angular/core';
 import {ChartModule} from 'primeng/chart';
-import {FormsModule, ReactiveFormsModule} from '@angular/forms';
+import {FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
 import {of, skip, switchMap, take, tap} from 'rxjs';
 import {
@@ -30,6 +30,9 @@ import {Tag} from 'primeng/tag';
 import {ToggleButton} from 'primeng/togglebutton';
 import {Button} from 'primeng/button';
 import {Tooltip} from 'primeng/tooltip';
+import {Dialog} from 'primeng/dialog';
+import {InputText} from 'primeng/inputtext';
+import {Select} from 'primeng/select';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -50,12 +53,16 @@ import {Tooltip} from 'primeng/tooltip';
     ToggleButton,
     Button,
     Tooltip,
+    Dialog,
+    InputText,
+    Select,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
 })
 export class BankTransactionsComponent implements OnInit {
   private dr = inject(DestroyRef);
+  private fb = inject(FormBuilder);
 
   private message = inject(MessageService);
   private mcc_service = inject(MccService);
@@ -70,6 +77,41 @@ export class BankTransactionsComponent implements OnInit {
   tags = new Set<TransactionTag>();
   selected_transactions: BankTransaction[] = [];
   protected selected_tag_map: Record<string, boolean> = {};
+
+  show_add_tag_dialog = false;
+  batch_tag_form = this.fb.group({
+    rows: this.fb.array([this.create_tag_row()]),
+  });
+
+  get tag_rows() {
+    return this.batch_tag_form.get('rows') as FormArray;
+  }
+
+  private create_tag_row() {
+    return this.fb.group({
+      tag:      ['', [Validators.required, Validators.minLength(1)]],
+      severity: ['primary', Validators.required],
+    });
+  }
+
+  add_tag_row() {
+    this.tag_rows.push(this.create_tag_row());
+  }
+
+  remove_tag_row(index: number) {
+    if (this.tag_rows.length > 1) {
+      this.tag_rows.removeAt(index);
+    }
+  }
+
+  readonly severity_options = [
+    {label: 'Primary',   value: 'primary'},
+    {label: 'Success',   value: 'success'},
+    {label: 'Info',      value: 'info'},
+    {label: 'Warn',      value: 'warn'},
+    {label: 'Danger',    value: 'danger'},
+    {label: 'Contrast',  value: 'contrast'},
+  ];
 
   // Maps a PrimeNG tag severity to togglebutton design-token overrides.
   // Checked (on)  → full severity colour.
@@ -600,6 +642,53 @@ export class BankTransactionsComponent implements OnInit {
     );
     this.on_chart_select(this.chart_idx, t_list);
     this.cd.detectChanges();
+  }
+
+  open_add_tag_dialog() {
+    if (this.selected_transactions.length === 0) {
+      this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
+      return;
+    }
+    // Reset to exactly one empty row
+    while (this.tag_rows.length > 1) this.tag_rows.removeAt(1);
+    this.tag_rows.at(0).reset({tag: '', severity: 'primary'});
+    this.show_add_tag_dialog = true;
+  }
+
+  submit_add_tag() {
+    if (this.batch_tag_form.invalid) return;
+
+    const new_tags: TransactionTag[] = (this.batch_tag_form.value.rows as {tag: string; severity: string}[])
+      .map(r => ({tag: r.tag, severity: r.severity}));
+
+    const payload = this.selected_transactions.map(t => ({
+      idt: t.idt,
+      tags: new_tags,
+    }));
+
+    this.t_service.add_transactions_tags(payload).pipe(
+      take(1),
+      tap((results) => {
+        if (!results || results.length === 0) return;
+
+        // Build a lookup: transaction id → returned tags
+        const tag_map = new Map(results.map(r => [r['idt'], r['tags'] as TransactionTag[]]));
+
+        // Patch tags in place — no refetch needed
+        this.transactions = this.transactions.map(t => {
+          const updated = tag_map.get(t.idt);
+          return updated ? {...t, tags: updated} : t;
+        });
+
+        this.cd.detectChanges();
+        this.show_add_tag_dialog = false;
+        this.message.add({
+          severity: 'success',
+          summary: 'Теги',
+          detail: `${new_tags.length} тег(и) додано до ${results.length} транзакцій.`,
+        });
+      }),
+    ).subscribe();
   }
 }
 
