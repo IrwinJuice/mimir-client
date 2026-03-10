@@ -75,6 +75,7 @@ export class BankTransactionsComponent implements OnInit {
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
   tags = new Set<TransactionTag>();
+  all_tag_names: string[] = [];
   tags_suggestions: string[] = [];
   selected_transactions: BankTransaction[] = [];
   protected selected_tag_map: Record<string, boolean> = {};
@@ -100,9 +101,31 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   remove_tag_row(index: number) {
-    if (this.tag_rows.length > 1) {
-      this.tag_rows.removeAt(index);
-    }
+    if (this.tag_rows.length > 1) this.tag_rows.removeAt(index);
+  }
+
+  show_delete_tag_dialog = false;
+  batch_delete_tag_form = this.fb.group({
+    rows: this.fb.array([this.create_delete_tag_row()]),
+  });
+
+  get delete_tag_rows() {
+    return this.batch_delete_tag_form.get('rows') as FormArray;
+  }
+
+  private create_delete_tag_row() {
+    return this.fb.group({
+      tag:      ['', [Validators.required, Validators.minLength(1)]],
+      severity: ['primary', Validators.required],
+    });
+  }
+
+  add_delete_tag_row() {
+    this.delete_tag_rows.push(this.create_delete_tag_row());
+  }
+
+  remove_delete_tag_row(index: number) {
+    if (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(index);
   }
 
   readonly severity_options = [
@@ -225,7 +248,8 @@ export class BankTransactionsComponent implements OnInit {
         this.tags.clear();
         tags.forEach(t => this.tags.add(t));
         // Keep unique suggestions by tag name
-        this.tags_suggestions = [...new Set([...this.tags].map(t => t.tag))];
+        this.all_tag_names = [...new Set([...this.tags].map(t => t.tag))];
+        this.tags_suggestions = [...this.all_tag_names];
       }),
       take(1),
     ).subscribe()
@@ -652,10 +676,19 @@ export class BankTransactionsComponent implements OnInit {
       this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
       return;
     }
-    // Reset to exactly one empty row
     while (this.tag_rows.length > 1) this.tag_rows.removeAt(1);
     this.tag_rows.at(0).reset({tag: '', severity: 'primary'});
     this.show_add_tag_dialog = true;
+  }
+
+  open_delete_tag_dialog() {
+    if (this.selected_transactions.length === 0) {
+      this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
+      return;
+    }
+    while (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(1);
+    this.delete_tag_rows.at(0).reset({tag: '', severity: 'primary'});
+    this.show_delete_tag_dialog = true;
   }
 
   submit_add_tag() {
@@ -690,7 +723,8 @@ export class BankTransactionsComponent implements OnInit {
           }
         }
         // update unique tag list once after loop
-        this.tags_suggestions = [...new Set([...this.tags].map(t => t.tag))];
+        this.all_tag_names = [...new Set([...this.tags].map(t => t.tag))];
+        this.tags_suggestions = [...this.all_tag_names];
 
 
         this.cd.detectChanges();
@@ -707,8 +741,42 @@ export class BankTransactionsComponent implements OnInit {
   protected search($event: AutoCompleteCompleteEvent) {
     const query = ($event.query ?? '').toLowerCase();
     this.tags_suggestions = query
-      ? this.tags_suggestions.filter(t => t.toLowerCase().includes(query))
-      : [...this.tags_suggestions];
+      ? this.all_tag_names.filter(t => t.toLowerCase().includes(query))
+      : [...this.all_tag_names];
+  }
+
+  submit_delete_tag() {
+    if (this.batch_delete_tag_form.invalid) return;
+
+    const tags_to_delete: TransactionTag[] = (this.batch_delete_tag_form.value.rows as { tag: string; severity: string }[])
+      .map(r => ({tag: r.tag, severity: r.severity}));
+
+    const payload = this.selected_transactions.map(t => ({
+      idt: t.idt,
+      tags: tags_to_delete,
+    }));
+
+    this.t_service.delete_transactions_tags(payload).pipe(
+      take(1),
+      tap((results) => {
+        if (!results || results.length === 0) return;
+
+        const tag_map = new Map(results.map(r => [r['idt'], r['tags'] as TransactionTag[]]));
+
+        this.transactions = this.transactions.map(t => {
+          const updated = tag_map.get(t.idt);
+          return updated ? {...t, tags: updated} : t;
+        });
+
+        this.cd.detectChanges();
+        this.show_delete_tag_dialog = false;
+        this.message.add({
+          severity: 'success',
+          summary: 'Теги',
+          detail: `${tags_to_delete.length} тег(и) видалено з ${results.length} транзакцій.`,
+        });
+      }),
+    ).subscribe();
   }
 }
 
