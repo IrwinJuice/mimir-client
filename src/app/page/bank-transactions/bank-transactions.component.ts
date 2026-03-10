@@ -5,13 +5,12 @@ import {Mcc, MccService} from '../../service/mcc.service';
 import {of, skip, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
-  BankTransactionFilter,
+  BankTransactionFilter, EXCEPTIONS_STORAGE_KEY,
   FilterException,
   TransactionService,
   TransactionTag
 } from '../../service/transaction.service';
 import {
-  EXCEPTIONS_STORAGE_KEY,
   FILTER_FIELDS,
   NUMBER_OPERATORS,
   STRING_OPERATORS,
@@ -29,6 +28,8 @@ import {AgTooltipRendererResult} from 'ag-charts-enterprise';
 import {Filter} from '../../components/filter/filter';
 import {Tag} from 'primeng/tag';
 import {ToggleButton} from 'primeng/togglebutton';
+import {Button} from 'primeng/button';
+import {Tooltip} from 'primeng/tooltip';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -47,6 +48,8 @@ import {ToggleButton} from 'primeng/togglebutton';
     Filter,
     Tag,
     ToggleButton,
+    Button,
+    Tooltip,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -536,7 +539,47 @@ export class BankTransactionsComponent implements OnInit {
 
     const filter: BankTransactionFilter = {
       ...last,
-      exceptions: this.exceptions,
+      exceptions: this.build_active_exceptions(),
+    };
+    this.t_service.get_transactions(filter).pipe(
+      take(1),
+      tap((t_list) => {
+        this.refill_transactions(t_list);
+      }),
+    ).subscribe();
+  }
+
+  /**
+   * Called whenever a tag toggle button changes state.
+   * Off → adds an AND NOT exception for that tag.
+   * On  → removes the exception.
+   */
+  on_tag_toggle() {
+    this.fetch_with_current_exceptions();
+  }
+
+  /**
+   * Merges the user-defined exceptions with the tag-derived exceptions
+   * and returns the combined list used for every fetch.
+   */
+  private build_active_exceptions(): FilterException[] {
+    const tag_exceptions: FilterException[] = Object.entries(this.selected_tag_map)
+      .filter(([, enabled]) => !enabled)
+      .map(([tag_name]) => ({
+        combinator: 'AND NOT',
+        conditions: [{field: 'tag', operator: 'eq', value: tag_name}],
+      } as FilterException));
+
+    return [...this.exceptions, ...tag_exceptions];
+  }
+
+  private fetch_with_current_exceptions() {
+    const last = this.t_service.last_transactions_filter;
+    if (!last) return;
+
+    const filter: BankTransactionFilter = {
+      ...last,
+      exceptions: this.build_active_exceptions(),
     };
     this.t_service.get_transactions(filter).pipe(
       take(1),
@@ -548,10 +591,8 @@ export class BankTransactionsComponent implements OnInit {
 
   private refill_transactions(t_list: BankTransaction[]) {
     this.transactions = t_list || [];
-    // this.tags.clear();
     t_list.forEach((t) =>
       t.tags.forEach((tag) => {
-        // this.tags.add(tag);
         if (!(tag.tag in this.selected_tag_map)) {
           this.selected_tag_map[tag.tag] = true;
         }
@@ -561,3 +602,4 @@ export class BankTransactionsComponent implements OnInit {
     this.cd.detectChanges();
   }
 }
+

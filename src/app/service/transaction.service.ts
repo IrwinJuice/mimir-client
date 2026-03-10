@@ -4,6 +4,8 @@ import {HttpClient} from '@angular/common/http';
 import {catchError, Observable, of, Subject, tap} from 'rxjs';
 import {environment} from '../../environments/environment';
 
+export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+
 export interface BankTransaction {
   id: string,
   external_id: string,
@@ -183,6 +185,13 @@ export class TransactionService {
         return of(null);
       })
     );
+  }
+
+  /**
+   * Saves the current exception list to local storage.
+   */
+  save_exceptions_to_storage(data: FilterException[]): void {
+    localStorage.setItem(EXCEPTIONS_STORAGE_KEY, JSON.stringify(data));
   }
 
 }

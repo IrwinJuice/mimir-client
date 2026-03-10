@@ -5,12 +5,12 @@ import {InputText} from 'primeng/inputtext';
 import {Tooltip} from 'primeng/tooltip';
 import {Fieldset} from 'primeng/fieldset';
 import {FormArray, FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
-import {FilterCondition, FilterException} from '../../service/transaction.service';
+import {FilterCondition, FilterException, TransactionService} from '../../service/transaction.service';
 import {
   COMBINATORS,
-  EXCEPTIONS_STORAGE_KEY,
   FILTER_FIELDS,
-  FilterField, FilterOperator,
+  FilterField,
+  FilterOperator,
   NUMBER_OPERATORS,
   STRING_OPERATORS
 } from '../../service/account.service';
@@ -41,6 +41,7 @@ import {
 })
 export class Filter implements OnInit {
   private fb = inject(FormBuilder);
+  private t_service = inject(TransactionService);
 
   /**
    * Available fields that can be selected for a filter condition.
@@ -190,6 +191,7 @@ export class Filter implements OnInit {
     });
     this.exceptions.push(group);
   }
+
   //
   // /**
   //  * Adds a pre-populated default exception group.
@@ -213,13 +215,6 @@ export class Filter implements OnInit {
     this.exceptions.removeAt(group_index);
   }
 
-  /**
-   * Saves the current exception list to local storage.
-   */
-  private save_exceptions_to_storage(): void {
-    const data = this.build_exceptions();
-    localStorage.setItem(EXCEPTIONS_STORAGE_KEY, JSON.stringify(data));
-  }
 
   /**
    * Adds a new empty condition row to an existing exception group.
@@ -273,7 +268,8 @@ export class Filter implements OnInit {
    * Persists the current exceptions and emits them to the parent component.
    */
   apply_exceptions() {
-    this.save_exceptions_to_storage();
+    const data = this.build_exceptions();
+    this.t_service.save_exceptions_to_storage(data);
     this.exChange.emit(this.build_exceptions());
   }
 }

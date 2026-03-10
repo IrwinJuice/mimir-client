@@ -6,7 +6,6 @@ import {BehaviorSubject, catchError, Observable, of, Subject} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
 
 
-export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
 
 export const FILTER_FIELDS: FilterField[] = [
   {label: 'Amount', value: 'amount', type: 'number'},

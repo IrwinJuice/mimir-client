@@ -24,6 +24,7 @@ import {DateTimeService} from '../../service/date-time.service';
 import {ThemeService} from '../../service/theme.service';
 import {TransactionService} from '../../service/transaction.service';
 import {Popover} from 'primeng/popover';
+import {Tooltip} from 'primeng/tooltip';
 
 interface Column {
   field: string;
@@ -44,6 +45,7 @@ interface Column {
     TreeTableModule,
     ProgressBar,
     Popover,
+    Tooltip,
   ],
   templateUrl: './accounts.html',
   styleUrl: './accounts.scss',

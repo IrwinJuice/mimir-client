@@ -16,13 +16,16 @@
       </p-tabpanel>
       <p-tabpanel value="1">
         <div class="flex flex-wrap gap-2 mb-2 items-center">
+          <p-button  size="small" pTooltip="Додати тег" [rounded]="true" [outlined]="true" icon="pi pi-plus" />
+          <p-button  size="small" pTooltip="Видалити тег" [rounded]="true" [outlined]="true" severity="danger" icon="pi pi-trash" />
           @for (tag of tags; track tag) {
             <p-toggleButton
               [(ngModel)]="selected_tag_map[tag.tag]"
               [onLabel]="tag.tag"
               [offLabel]="tag.tag"
               [style]="tag_toggle_style(tag.severity)"
-              size="small"/>
+              size="small"
+              (onChange)="on_tag_toggle()"/>
           }
         </div>
         <p-table [value]="transactions"
