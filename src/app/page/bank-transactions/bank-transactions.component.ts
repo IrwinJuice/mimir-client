@@ -31,8 +31,8 @@ import {ToggleButton} from 'primeng/togglebutton';
 import {Button} from 'primeng/button';
 import {Tooltip} from 'primeng/tooltip';
 import {Dialog} from 'primeng/dialog';
-import {InputText} from 'primeng/inputtext';
 import {Select} from 'primeng/select';
+import {AutoComplete, AutoCompleteCompleteEvent} from 'primeng/autocomplete';
 
 @Component({
   selector: 'app-bank-transaction',
@@ -54,8 +54,8 @@ import {Select} from 'primeng/select';
     Button,
     Tooltip,
     Dialog,
-    InputText,
     Select,
+    AutoComplete,
   ],
   templateUrl: './bank-transactions.component.html',
   styleUrl: './bank-transactions.component.scss',
@@ -75,6 +75,7 @@ export class BankTransactionsComponent implements OnInit {
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
   tags = new Set<TransactionTag>();
+  tags_suggestions: string[] = [];
   selected_transactions: BankTransaction[] = [];
   protected selected_tag_map: Record<string, boolean> = {};
 
@@ -89,7 +90,7 @@ export class BankTransactionsComponent implements OnInit {
 
   private create_tag_row() {
     return this.fb.group({
-      tag:      ['', [Validators.required, Validators.minLength(1)]],
+      tag: ['', [Validators.required, Validators.minLength(1)]],
       severity: ['primary', Validators.required],
     });
   }
@@ -105,12 +106,12 @@ export class BankTransactionsComponent implements OnInit {
   }
 
   readonly severity_options = [
-    {label: 'Primary',   value: 'primary'},
-    {label: 'Success',   value: 'success'},
-    {label: 'Info',      value: 'info'},
-    {label: 'Warn',      value: 'warn'},
-    {label: 'Danger',    value: 'danger'},
-    {label: 'Contrast',  value: 'contrast'},
+    {label: 'Primary', value: 'primary'},
+    {label: 'Success', value: 'success'},
+    {label: 'Info', value: 'info'},
+    {label: 'Warn', value: 'warn'},
+    {label: 'Danger', value: 'danger'},
+    {label: 'Contrast', value: 'contrast'},
   ];
 
   // Maps a PrimeNG tag severity to togglebutton design-token overrides.
@@ -223,6 +224,8 @@ export class BankTransactionsComponent implements OnInit {
       tap((tags) => {
         this.tags.clear();
         tags.forEach(t => this.tags.add(t));
+        // Keep unique suggestions by tag name
+        this.tags_suggestions = [...new Set([...this.tags].map(t => t.tag))];
       }),
       take(1),
     ).subscribe()
@@ -658,7 +661,7 @@ export class BankTransactionsComponent implements OnInit {
   submit_add_tag() {
     if (this.batch_tag_form.invalid) return;
 
-    const new_tags: TransactionTag[] = (this.batch_tag_form.value.rows as {tag: string; severity: string}[])
+    const new_tags: TransactionTag[] = (this.batch_tag_form.value.rows as { tag: string; severity: string }[])
       .map(r => ({tag: r.tag, severity: r.severity}));
 
     const payload = this.selected_transactions.map(t => ({
@@ -680,6 +683,16 @@ export class BankTransactionsComponent implements OnInit {
           return updated ? {...t, tags: updated} : t;
         });
 
+        for (const ntag of new_tags) {
+          this.tags.add(ntag);
+          if (!(ntag.tag in this.selected_tag_map)) {
+            this.selected_tag_map[ntag.tag] = true;
+          }
+        }
+        // update unique tag list once after loop
+        this.tags_suggestions = [...new Set([...this.tags].map(t => t.tag))];
+
+
         this.cd.detectChanges();
         this.show_add_tag_dialog = false;
         this.message.add({
@@ -689,6 +702,13 @@ export class BankTransactionsComponent implements OnInit {
         });
       }),
     ).subscribe();
+  }
+
+  protected search($event: AutoCompleteCompleteEvent) {
+    const query = ($event.query ?? '').toLowerCase();
+    this.tags_suggestions = query
+      ? this.tags_suggestions.filter(t => t.toLowerCase().includes(query))
+      : [...this.tags_suggestions];
   }
 }
 

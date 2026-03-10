@@ -102,12 +102,13 @@
         <div [formGroupName]="$index" class="flex gap-2 items-start">
 
           <div class="flex flex-col gap-1 flex-1">
-            <input
-              pInputText
+            <p-autoComplete
               formControlName="tag"
+              [suggestions]="tags_suggestions"
+              [dropdown]="true"
+              appendTo="body"
               placeholder="Назва тегу"
-              class="w-full"
-            />
+              (completeMethod)="search($event)" />
             @if (row.get('tag')?.invalid && row.get('tag')?.touched) {
               <small class="text-red-500">Введіть назву тегу</small>
             }
