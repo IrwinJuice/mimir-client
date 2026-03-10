@@ -115,7 +115,7 @@ export class BankTransactionsComponent implements OnInit {
 
   private create_delete_tag_row() {
     return this.fb.group({
-      tag:      ['', [Validators.required, Validators.minLength(1)]],
+      tag: ['', [Validators.required, Validators.minLength(1)]],
       severity: ['primary', Validators.required],
     });
   }
@@ -179,6 +179,8 @@ export class BankTransactionsComponent implements OnInit {
       {name: 'MCC Витрати', chart_idx: 3},
       {name: 'MCC-G Витрати', chart_idx: 4},
       {name: 'MCC Дохід', chart_idx: 5},
+      {name: 'Tag Витрати', chart_idx: 6},
+      {name: 'Tag Дохід', chart_idx: 7},
     ];
 
     this.exceptions = this.restore_exceptions_from_storage();
@@ -349,6 +351,12 @@ export class BankTransactionsComponent implements OnInit {
         break;
       case 5:
         this.draw_mcc_income(t_list)
+        break;
+      case 6:
+        this.draw_tags_outcome(t_list)
+        break;
+      case 7:
+        this.draw_tags_income(t_list)
         break;
     }
 
@@ -748,7 +756,10 @@ export class BankTransactionsComponent implements OnInit {
   submit_delete_tag() {
     if (this.batch_delete_tag_form.invalid) return;
 
-    const tags_to_delete: TransactionTag[] = (this.batch_delete_tag_form.value.rows as { tag: string; severity: string }[])
+    const tags_to_delete: TransactionTag[] = (this.batch_delete_tag_form.value.rows as {
+      tag: string;
+      severity: string
+    }[])
       .map(r => ({tag: r.tag, severity: r.severity}));
 
     const payload = this.selected_transactions.map(t => ({
@@ -777,6 +788,79 @@ export class BankTransactionsComponent implements OnInit {
         });
       }),
     ).subscribe();
+  }
+
+  private draw_tags_income(t_list: BankTransaction[]) {
+
+    const tag_map = new Map<TransactionTag, number>
+
+    // this.tags.forEach((tag) => {
+    //   tag_map.set(tag, 0)
+    // });
+    t_list.forEach((trans) => {
+      if (trans.amount > 0) {
+        trans.tags.forEach((tag) => {
+          const current_value = tag_map.get(tag) ?? 0;
+          tag_map.set(tag, current_value + trans.amount)
+        })
+      }
+    })
+
+    const data = [...tag_map]
+      .map(([k, v]) => {
+        return {
+          label: `${k.tag}:${k.severity}`,
+          income: Math.abs(v) / 100,  // positive value, UAH
+        };
+      }).filter((i) => i.income !== 0)
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const is_dark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    this.options = {
+      theme: is_dark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'donut', angleKey: 'income', calloutLabelKey: 'label', fills}],
+    };
+    this.cd.detectChanges();
+  }
+
+  private draw_tags_outcome(t_list: BankTransaction[]) {
+
+    const tag_map = new Map<TransactionTag, number>
+
+    // this.tags.forEach((tag) => {
+    //   tag_map.set(tag, 0)
+    // });
+    t_list.forEach((trans) => {
+      if (trans.amount < 0) {
+        trans.tags.forEach((tag) => {
+          const current_value = tag_map.get(tag) ?? 0;
+          tag_map.set(tag, current_value + trans.amount)
+        })
+      }
+    })
+
+    const data = [...tag_map]
+      .map(([k, v]) => {
+        return {
+          label: `${k.tag}:${k.severity}`,
+          income: Math.abs(v) / 100,  // positive value, UAH
+        };
+      }).filter((i) => i.income !== 0)
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    const is_dark = this.theme_state().darkTheme;
+    const fills = this.theme_service.get_chart_fills();
+    this.options = {
+      theme: is_dark ? 'ag-default-dark' : 'ag-default',
+      background: {visible: false},
+      data,
+      series: [{type: 'donut', angleKey: 'income', calloutLabelKey: 'label', fills}],
+    };
+    this.cd.detectChanges();
+
   }
 }
 
