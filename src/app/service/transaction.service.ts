@@ -53,6 +53,11 @@ export interface BankTransactionFilter {
   to: string | number
 }
 
+interface BankTransactionTag {
+  idt: string,
+  tags: TransactionTag[]
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -187,6 +192,23 @@ export class TransactionService {
     );
   }
 
+  add_transactions_tags(tags: BankTransactionTag[]): Observable<BankTransactionTag[]> {
+    const url = `${environment.apiBase}/tags/batch_insert`;
+    return this.http.post<BankTransactionTag[]>(url, tags).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        return of([]);
+      }));
+  }
+
+  delete_transactions_tags(tags: BankTransactionTag[]): Observable<BankTransactionTag[]> {
+    const url = `${environment.apiBase}/tags/batch_delete`;
+    return this.http.post<BankTransactionTag[]>(url, tags).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        return of([]);
+      }));
+  }
   /**
    * Saves the current exception list to local storage.
    */
