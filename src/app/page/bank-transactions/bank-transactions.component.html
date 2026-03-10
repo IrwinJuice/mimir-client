@@ -68,7 +68,7 @@
               <td>{{ transaction.mcc_description }}</td>
               <td >
                 @for (tag of transaction.tags; track tag) {
-                  <p-tag [severity]="$any(tag.severity)" [value]="tag.tag"/>
+                  <p-tag class="ml-2" [severity]="$any(tag.severity)" [value]="tag.tag"/>
                 }
               </td>
               <td>{{ to_uk_date(transaction.transaction_time) }}</td>

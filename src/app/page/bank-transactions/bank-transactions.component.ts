@@ -174,6 +174,13 @@ export class BankTransactionsComponent implements OnInit {
 
   ngOnInit() {
 
+    this.t_service.get_all_transactions_tags().pipe(
+      tap((tags) => {
+        this.tags.clear();
+        tags.forEach(t => this.tags.add(t));
+      }),
+      take(1),
+    ).subscribe()
 
     this.mcc_service.fetch_mcc().pipe(
       switchMap((mcc_list_or_empty) => {
@@ -541,10 +548,10 @@ export class BankTransactionsComponent implements OnInit {
 
   private refill_transactions(t_list: BankTransaction[]) {
     this.transactions = t_list || [];
-    this.tags.clear();
+    // this.tags.clear();
     t_list.forEach((t) =>
       t.tags.forEach((tag) => {
-        this.tags.add(tag);
+        // this.tags.add(tag);
         if (!(tag.tag in this.selected_tag_map)) {
           this.selected_tag_map[tag.tag] = true;
         }

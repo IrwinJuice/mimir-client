@@ -29,6 +29,7 @@ export interface TransactionTag {
   tag: string,
   severity: string,
 }
+
 export interface FilterCondition {
   field: string;      // 'amount' | 'currency' | 'description' | 'receipt_id' | 'mcc'
   operator: string;   // 'eq' | 'neq' | 'lt' | 'gt' | 'lte' | 'gte' | 'startsWith' | 'endsWith' | 'contains'
@@ -172,6 +173,16 @@ export class TransactionService {
       a.click();
       URL.revokeObjectURL(url);
     });
+  }
+
+  get_all_transactions_tags(): Observable<TransactionTag[]> {
+    const url = `${environment.apiBase}/tags`;
+    return this.http.get<TransactionTag[]>(url).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        return of(null);
+      })
+    );
   }
 
 }
