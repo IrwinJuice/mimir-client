@@ -81,7 +81,7 @@ export class Accounts implements OnInit {
   protected monitors: AccountMonitor[] = [];
 
   accounts_tree: TreeNode[] = [];
-  selection_keys: Record<string, {checked: boolean}> = {};
+  selection_keys: Record<string, { checked: boolean }> = {};
   cols!: Column[];
 
   ngOnInit(): void {
@@ -119,8 +119,8 @@ export class Accounts implements OnInit {
                   name: m.masked_pan,
                   loading: m.status === AccountMonitorStatus.PENDING,
                   balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                  updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                  last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
                 };
                 this.accounts_tree = [...this.accounts_tree];
                 this.cdr.detectChanges();
@@ -168,8 +168,8 @@ export class Accounts implements OnInit {
                 name: m.masked_pan,
                 loading: m.status === AccountMonitorStatus.PENDING,
                 balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
               },
               leaf: true
             });
@@ -186,7 +186,7 @@ export class Accounts implements OnInit {
     ).subscribe();
   }
 
-  on_selection_change(keys: Record<string, {checked: boolean}>): void {
+  on_selection_change(keys: Record<string, { checked: boolean }>): void {
     this.selection_keys = keys;
 
     const ida_list: number[] = [];
@@ -268,7 +268,6 @@ export class Accounts implements OnInit {
     }
   }
 
-  // Use date-picker rangeDates to call stats endpoint
   fetch_stats() {
     this.loading = true;
     const time_range = this.dt_service.time_range;
@@ -282,9 +281,9 @@ export class Accounts implements OnInit {
     // - `from`: the start of the selected day in the local timezone (00:00:00 local) converted to UTC
     // - `to`: the end of the selected day in the local timezone (23:59:59.999 local) converted to UTC
     const from_iso_date = DateTime.fromJSDate(time_range[0], {zone: 'local'}).toISODate();
-    const from_dt =DateTime.fromISO(from_iso_date, { zone: 'utc' }).startOf('day');
+    const from_dt = DateTime.fromISO(from_iso_date, {zone: 'utc'}).startOf('day');
     const to_iso_date = DateTime.fromJSDate(time_range[1], {zone: 'local'}).toISODate();
-    const to_dt =DateTime.fromISO(to_iso_date, { zone: 'utc' }).endOf('day');
+    const to_dt = DateTime.fromISO(to_iso_date, {zone: 'utc'}).endOf('day');
 
     const from = Math.floor(from_dt.toSeconds());
     const to = Math.floor(to_dt.toSeconds());
@@ -293,6 +292,7 @@ export class Accounts implements OnInit {
     this.account_service.update_accounts_stat(from, to).pipe(
       tap((result) => {
         if (result) {
+          console.log('result', result)
           this.monitors = result;
 
           // Build a new accountsTree immutably so change detection picks up child changes
@@ -303,19 +303,25 @@ export class Accounts implements OnInit {
               return parts.length > 1 ? Number(parts[1]) : undefined;
             })();
 
-            const children = (result as AccountMonitor[]).filter(m => m.ida === acc_id).map(m => ({
-              key: `monitor-${m.ida}-${m.external_id}`,
-              data: {
-                ida: m.ida,
-                external_id: m.external_id,
-                kind: m.masked_pan,
-                loading: m.status === AccountMonitorStatus.PENDING,
-                balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'utc'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-              },
-              leaf: true
-            }));
+            const children = result
+              .filter(m => m.ida === acc_id)
+              .map(m => ({
+                key: `monitor-${m.ida}-${m.external_id}`,
+                data: {
+
+                  // include ida and external_id for reliable future lookups
+                  ida: m.ida,
+                  iban: m.iban,
+                  external_id: m.external_id,
+                  color: this.theme_service.resolve_monitor_color(m.external_id),
+                  name: m.masked_pan,
+                  loading: m.status === AccountMonitorStatus.PENDING,
+                  balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
+                  updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                },
+                leaf: true
+              }));
 
             // update selection keys for the monitors of this account
             children.forEach(ch => this.selection_keys[ch.key] = {checked: true});
