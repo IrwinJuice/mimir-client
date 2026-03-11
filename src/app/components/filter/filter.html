@@ -54,6 +54,18 @@
                   placeholder="Значення"
                   class="flex-1"
                 />
+                <!-- 4rd: severity -->
+                @if (show_severity(gi, ci)) {
+                  <p-select
+                    formControlName="severity"
+                    [options]="severity_options"
+                    optionLabel="label"
+                    optionValue="value"
+                    appendTo="body"
+                    placeholder="Серйозність"
+                    class="flex-1 w-40"
+                  />
+                }
                 <p-button icon="pi pi-minus" severity="secondary" [text]="true" size="small"
                           (click)="remove_condition(gi, ci)" pTooltip="Видалити умову"/>
               </div>

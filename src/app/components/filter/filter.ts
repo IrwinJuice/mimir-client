@@ -5,15 +5,23 @@ import {InputText} from 'primeng/inputtext';
 import {Tooltip} from 'primeng/tooltip';
 import {Fieldset} from 'primeng/fieldset';
 import {FormArray, FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
-import {FilterCondition, FilterException, TransactionService} from '../../service/transaction.service';
+import {
+  FilterCondition,
+  FilterException,
+  Severity,
+  SEVERITY_OPTIONS,
+  TransactionService
+} from '../../service/transaction.service';
 import {
   COMBINATORS,
   FILTER_FIELDS,
   FilterField,
   FilterOperator,
   NUMBER_OPERATORS,
-  STRING_OPERATORS
+  STRING_OPERATORS,
+  TAG_OPERATORS
 } from '../../service/account.service';
+import {NgClass} from '@angular/common';
 
 /**
  * UI component for building and applying exception-based transaction filters.
@@ -35,6 +43,8 @@ import {
     Fieldset,
     Tooltip,
     ReactiveFormsModule,
+    NgClass,
+
   ],
   templateUrl: './filter.html',
   styleUrl: './filter.scss',
@@ -90,7 +100,7 @@ export class Filter implements OnInit {
         const conditions = ex.conditions
           .map(c => {
             const field = FILTER_FIELDS.find(f => f.value === c.field) ?? null;
-            const operator_list = field?.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
+            const operator_list = field?.type === 'number' ? NUMBER_OPERATORS : (field?.type === 'string' ? STRING_OPERATORS : TAG_OPERATORS);
             const operator = operator_list.find(o => o.value === c.operator) ?? null;
             return this.new_condition_group(field, operator, c.value);
           });
@@ -137,7 +147,7 @@ export class Filter implements OnInit {
   get_operators_for(group_index: number, cond_index: number): FilterOperator[] {
     const field: FilterField | null = this.get_conditions(group_index).at(cond_index)?.get('field')?.value;
     if (!field) return [];
-    return field.type === 'number' ? NUMBER_OPERATORS : STRING_OPERATORS;
+    return field?.type === 'number' ? NUMBER_OPERATORS : (field?.type === 'string' ? STRING_OPERATORS : TAG_OPERATORS);
   }
 
   /**
@@ -153,14 +163,24 @@ export class Filter implements OnInit {
     const has_field = !!cond.get('field')?.value;
     const operator_ctrl = cond.get('operator')!;
     const value_ctrl = cond.get('value')!;
+    const severity_ctrl = cond.get('severity')!;
     if (has_field) {
       operator_ctrl.enable();
       value_ctrl.enable();
+      severity_ctrl.enable();
     } else {
       operator_ctrl.disable();
       value_ctrl.disable();
+      severity_ctrl.disable();
     }
+
     cond.patchValue({operator: null, value: ''});
+  }
+
+  show_severity(group_index: number, cond_index: number): boolean {
+    const cond = this.get_conditions(group_index).at(cond_index);
+    const field: FilterField | null = cond.get('field')?.value;
+    return field?.type === 'tag';
   }
 
   /**
@@ -171,13 +191,15 @@ export class Filter implements OnInit {
    * @param field Initial field value.
    * @param operator Initial operator value.
    * @param value Initial comparison value.
+   * @param severity Initial severity value.
    */
-  private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value = '') {
+  private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value = '', severity: Severity | null = null) {
     const has_field = !!field;
     return this.fb.group({
       field: [field],
       operator: [{value: operator, disabled: !has_field}],
       value: [{value: value, disabled: !has_field}],
+      severity: [{value: severity, disabled: !has_field}],
     });
   }
 
@@ -192,19 +214,7 @@ export class Filter implements OnInit {
     this.exceptions.push(group);
   }
 
-  //
-  // /**
-  //  * Adds a pre-populated default exception group.
-  //  *
-  //  * @param conditions Condition definitions used to seed the new group.
-  //  */
-  // private add_default_exception(conditions: { field: FilterField, operator: FilterOperator, value: string }[]) {
-  //   const group = this.fb.group({
-  //     combinator: ['AND NOT'],
-  //     conditions: this.fb.array(conditions.map(c => this.new_condition_group(c.field, c.operator, c.value)))
-  //   });
-  //   this.exceptions.push(group);
-  // }
+  readonly severity_options: Severity[] = SEVERITY_OPTIONS;
 
   /**
    * Removes a filter exception group by index.

@@ -45,6 +45,20 @@ export interface FilterException {
   conditions: FilterCondition[];
 }
 
+export interface Severity {
+  label: string,
+  value: string
+}
+
+export const SEVERITY_OPTIONS: Severity[] = [
+  {label: 'Primary', value: 'primary'},
+  {label: 'Success', value: 'success'},
+  {label: 'Info', value: 'info'},
+  {label: 'Warn', value: 'warn'},
+  {label: 'Danger', value: 'danger'},
+  {label: 'Contrast', value: 'contrast'},
+];
+
 export interface BankTransactionFilter {
   ida_list: number[],
   external_id_list: string[],
@@ -209,6 +223,7 @@ export class TransactionService {
         return of([]);
       }));
   }
+
   /**
    * Saves the current exception list to local storage.
    */
