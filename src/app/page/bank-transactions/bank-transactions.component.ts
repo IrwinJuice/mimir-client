@@ -6,7 +6,7 @@ import {of, skip, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
   BankTransactionFilter, EXCEPTIONS_STORAGE_KEY,
-  FilterException,
+  FilterException, SEVERITY_OPTIONS,
   TransactionService,
   TransactionTag
 } from '../../service/transaction.service';
@@ -128,14 +128,6 @@ export class BankTransactionsComponent implements OnInit {
     if (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(index);
   }
 
-  readonly severity_options = [
-    {label: 'Primary', value: 'primary'},
-    {label: 'Success', value: 'success'},
-    {label: 'Info', value: 'info'},
-    {label: 'Warn', value: 'warn'},
-    {label: 'Danger', value: 'danger'},
-    {label: 'Contrast', value: 'contrast'},
-  ];
 
   // Maps a PrimeNG tag severity to togglebutton design-token overrides.
   // Checked (on)  → full severity colour.
@@ -171,6 +163,7 @@ export class BankTransactionsComponent implements OnInit {
   chart_idx = 1;
 
   exceptions: FilterException[] = [];
+  readonly severity_options = SEVERITY_OPTIONS;
 
   constructor() {
     this.chart_options = [
@@ -266,12 +259,17 @@ export class BankTransactionsComponent implements OnInit {
           return of([] as BankTransaction[]);
         }
 
-        const to_date: Date = time_range[1];
-        const from_date: Date = time_range[0];
+        // Normalize selected date range to UTC using Luxon. DatePicker return dd.mm.yy 00:00:00, but for 'to' we need end of the day.
+        // - `from`: the start of the selected day in the local timezone (00:00:00 local) converted to UTC
+        // - `to`: the end of the selected day in the local timezone (23:59:59.999 local) converted to UTC
+        const from_iso_date = DateTime.fromJSDate(time_range[0], {zone: 'local'}).toISODate();
+        const from_dt =DateTime.fromISO(from_iso_date, { zone: 'utc' }).startOf('day');
+        const to_iso_date = DateTime.fromJSDate(time_range[1], {zone: 'local'}).toISODate();
+        const to_dt =DateTime.fromISO(to_iso_date, { zone: 'utc' }).endOf('day');
 
-        // Convert to Unix timestamps (seconds since epoch)
-        const to = Math.floor(to_date.getTime() / 1000);
-        const from = Math.floor(from_date.getTime() / 1000);
+        const from = Math.floor(from_dt.toSeconds());
+        const to = Math.floor(to_dt.toSeconds());
+
         const filter: BankTransactionFilter = {
           external_id_list: [],
           ida_list: [],
@@ -294,11 +292,17 @@ export class BankTransactionsComponent implements OnInit {
           this.message.add({severity: 'warn', summary: 'Dates', detail: 'Please select a date range.'});
           return of([] as BankTransaction[]);
         }
-        const to_date: Date = time_range[1];
-        const from_date: Date = time_range[0];
-        // Convert to Unix timestamps (seconds since epoch)
-        const to = Math.floor(to_date.getTime() / 1000);
-        const from = Math.floor(from_date.getTime() / 1000);
+
+        // Normalize selected date range to UTC using Luxon. DatePicker return dd.mm.yy 00:00:00, but for 'to' we need end of the day.
+        // - `from`: the start of the selected day in the local timezone (00:00:00 local) converted to UTC
+        // - `to`: the end of the selected day in the local timezone (23:59:59.999 local) converted to UTC
+        const from_iso_date = DateTime.fromJSDate(time_range[0], {zone: 'local'}).toISODate();
+        const from_dt =DateTime.fromISO(from_iso_date, { zone: 'utc' }).startOf('day');
+        const to_iso_date = DateTime.fromJSDate(time_range[1], {zone: 'local'}).toISODate();
+        const to_dt =DateTime.fromISO(to_iso_date, { zone: 'utc' }).endOf('day');
+
+        const from = Math.floor(from_dt.toSeconds());
+        const to = Math.floor(to_dt.toSeconds());
 
         const filter: BankTransactionFilter = {
           ...this.t_service.last_transactions_filter,

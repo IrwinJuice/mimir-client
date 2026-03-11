@@ -24,7 +24,6 @@ import {DateTimeService} from '../../service/date-time.service';
 import {ThemeService} from '../../service/theme.service';
 import {TransactionService} from '../../service/transaction.service';
 import {Popover} from 'primeng/popover';
-import {Tooltip} from 'primeng/tooltip';
 
 interface Column {
   field: string;
@@ -97,15 +96,16 @@ export class Accounts implements OnInit {
 
     this.fetch_accounts();
 
-    this.subscribe_monito_status();
+    this.subscribe_monitor_status();
 
   }
 
-  private subscribe_monito_status() {
+  private subscribe_monitor_status() {
     this.account_service.monitor_status$
       .pipe(
         takeUntilDestroyed(this.dr),
         mergeMap((notification) => {
+          console.log('notification', notification)
           const account = this.accounts_tree.find((node) => node.data.ida === notification.ida);
           if (account) {
             const monitor = account.children.find((node) => node.data.external_id === notification.external_id);
@@ -136,6 +136,7 @@ export class Accounts implements OnInit {
 
   private fetch_accounts() {
     this.account_service.get_accounts().pipe(
+      take(1),
       switchMap((accounts) => {
         this.account_service.accounts = accounts;
         accounts.forEach((a) => {
@@ -277,19 +278,21 @@ export class Accounts implements OnInit {
       return;
     }
 
-    // rangeDates is [start, end] — convert to ISO strings (strip timezone if needed)
-    const to_date: Date = time_range[1];
-    const from_date: Date = time_range[0];
+    // Normalize selected date range to UTC using Luxon. DatePicker return dd.mm.yy 00:00:00, but for 'to' we need end of the day.
+    // - `from`: the start of the selected day in the local timezone (00:00:00 local) converted to UTC
+    // - `to`: the end of the selected day in the local timezone (23:59:59.999 local) converted to UTC
+    const from_iso_date = DateTime.fromJSDate(time_range[0], {zone: 'local'}).toISODate();
+    const from_dt =DateTime.fromISO(from_iso_date, { zone: 'utc' }).startOf('day');
+    const to_iso_date = DateTime.fromJSDate(time_range[1], {zone: 'local'}).toISODate();
+    const to_dt =DateTime.fromISO(to_iso_date, { zone: 'utc' }).endOf('day');
 
-    // Convert to Unix timestamps (seconds since epoch)
-    const to = Math.floor(to_date.getTime() / 1000);
-    const from = Math.floor(from_date.getTime() / 1000);
+    const from = Math.floor(from_dt.toSeconds());
+    const to = Math.floor(to_dt.toSeconds());
 
     // from should be < to
     this.account_service.update_accounts_stat(from, to).pipe(
       tap((result) => {
         if (result) {
-          console.log('accounts stats:', result);
           this.monitors = result;
 
           // Build a new accountsTree immutably so change detection picks up child changes

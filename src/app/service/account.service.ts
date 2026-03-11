@@ -5,14 +5,13 @@ import {environment} from '../../environments/environment';
 import {BehaviorSubject, catchError, Observable, of, Subject} from 'rxjs';
 import {WebSocketNotification} from './web-socket-service';
 
-
-
 export const FILTER_FIELDS: FilterField[] = [
+  {label: 'Tag', value: 'tag', type: 'tag'},
+  {label: 'MCC', value: 'mcc', type: 'number'},
+  {label: 'Description', value: 'description', type: 'string'},
   {label: 'Amount', value: 'amount', type: 'number'},
   {label: 'Currency', value: 'currency', type: 'string'},
-  {label: 'Description', value: 'description', type: 'string'},
   {label: 'Receipt ID', value: 'receipt_id', type: 'string'},
-  {label: 'MCC', value: 'mcc', type: 'number'},
   {label: 'Bank Acc. ID', value: 'external_id', type: 'string'},
 ]
 
@@ -33,6 +32,11 @@ export const NUMBER_OPERATORS: FilterOperator[] = [
   {label: '≥', value: 'gte'},
 ];
 
+export const TAG_OPERATORS: FilterOperator[] = [
+  {label: 'Дорівнює', value: 'eq'},
+  {label: 'Не дорівнює', value: 'neq'},
+];
+
 
 export const COMBINATORS = [
   {label: 'AND NOT', value: 'AND NOT'},
@@ -41,7 +45,7 @@ export const COMBINATORS = [
   {label: 'OR', value: 'OR'},
 ];
 
-export type FilterFieldType = 'number' | 'string';
+export type FilterFieldType = 'number' | 'string' | 'tag';
 
 export interface FilterField {
   label: string;
