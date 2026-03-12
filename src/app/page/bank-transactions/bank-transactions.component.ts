@@ -725,8 +725,7 @@ export class BankTransactionsComponent implements OnInit {
   submit_add_tag() {
     if (this.batch_tag_form.invalid) return;
 
-    const new_tags: TransactionTag[] = (this.batch_tag_form.value.rows as { tag: string; severity: string }[])
-      .map(r => ({tag: r.tag, severity: r.severity}));
+    const new_tags: TransactionTag[] = this.batch_tag_form.value.rows as TransactionTag[];
 
     const payload = this.selected_transactions.map(t => ({
       idt: t.idt,

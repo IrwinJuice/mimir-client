@@ -248,23 +248,6 @@ export class Filter implements OnInit {
   }
 
   /**
-   * Explicitly patches the combinator value on the exception group form.
-   * This works around a PrimeNG Select issue where optionValue does not
-   * reliably propagate changes through the ControlValueAccessor.
-   *
-   * @param group_index Index of the exception group.
-   * @param value The selected combinator string value.
-   */
-  on_combinator_change(group_index: number, value: string) {
-    this.exceptions.at(group_index).get('combinator')!.setValue(value);
-    console.log(this.exceptions.at(group_index))
-  }
-
-  // on_severity_change(group_index: number, cond_index: number, value: string) {
-  //   this.get_conditions(group_index).at(cond_index).get('severity')!.setValue(value);
-  // }
-
-  /**
    * Adds a new empty filter exception group to the form.
    */
   add_filter_exception() {

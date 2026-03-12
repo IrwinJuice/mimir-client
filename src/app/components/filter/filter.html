@@ -1,7 +1,7 @@
 <p-fieldset [legend]="'Фільтр (' + exceptions.controls.length + ')'" [collapsed]="true" [toggleable]="true">
   <form [formGroup]="exceptions_form" class="w-full" (submit)="apply_exceptions()">
     <div formArrayName="exceptions" class="flex flex-col gap-3 mt-2">
-      @for (group of exceptions.controls; track $index; let gi = $index) {
+      @for (group of exceptions.controls; track group; let gi = $index) {
         <div [formGroupName]="gi" class="border border-surface-200 dark:border-surface-700 rounded-lg p-3">
           <!-- Group header -->
           <div class="flex items-center justify-between mb-2">
@@ -12,7 +12,6 @@
                 optionLabel="label"
                 optionValue="value"
                 class="w-36"
-                (onChange)="on_combinator_change(gi, $event.value)"
               />
               <span class="text-xs text-surface-400">(умови групи об'єднані AND)</span>
             </div>
@@ -22,7 +21,7 @@
 
           <!-- Conditions rows -->
           <div formArrayName="conditions" class="flex flex-col gap-2">
-            @for (cond of get_conditions(gi).controls; track $index; let ci = $index) {
+            @for (cond of get_conditions(gi).controls; track cond; let ci = $index) {
               <div [formGroupName]="ci" class="flex items-center gap-2">
                 <!-- AND label after first row -->
                 @if (ci > 0) {
