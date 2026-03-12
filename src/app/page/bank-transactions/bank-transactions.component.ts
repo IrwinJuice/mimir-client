@@ -131,30 +131,6 @@ export class BankTransactionsComponent implements OnInit {
   }
 
 
-  // Maps a PrimeNG tag severity to togglebutton design-token overrides.
-  // Checked (on)  → full severity colour.
-  // Unchecked (off) → secondary / muted.
-  protected tag_toggle_style(severity: string): Record<string, string> {
-    const bg = `var(--p-tag-${severity}-background)`;
-    const fg = `var(--p-tag-${severity}-color)`;
-    return {
-
-      '--p-togglebutton-font-weight': 'bold',
-
-
-      '--p-togglebutton-checked-background': 'inherited',
-      '--p-togglebutton-checked-hover-background': bg,
-      '--p-togglebutton-checked-color': fg,
-      '--p-togglebutton-checked-border-color': 'inherited',// bg,
-      '--p-togglebutton-content-checked-background': bg,
-
-      '--p-togglebutton-background': 'inherited',//'var(--p-tag-secondary-background)',
-      '--p-togglebutton-hover-background': 'var(--p-tag-secondary-background)',
-      '--p-togglebutton-color': 'var(--p-tag-secondary-color)',
-      '--p-togglebutton-border-color': 'inherited',//'var(--p-tag-secondary-background)',
-      '--p-togglebutton-content-background': 'var(--p-tag-secondary-background)',
-    };
-  }
 
   data = {labels: [], datasets: []};
   options: any = this.create_default_chart_options();
@@ -187,6 +163,32 @@ export class BankTransactionsComponent implements OnInit {
       this.theme_state();
       this.on_chart_select(this.chart_idx, this.transactions);
     });
+  }
+
+  // Maps a PrimeNG tag severity to togglebutton design-token overrides.
+  // Checked (on)  → full severity color.
+  // Unchecked (off) → secondary / muted.
+  tag_toggle_style(severity: string): Record<string, string> {
+    console.log(this.selected_tag_map)
+    const bg = `var(--p-tag-${severity}-background)`;
+    const fg = `var(--p-tag-${severity}-color)`;
+    return {
+
+      '--p-togglebutton-font-weight': 'bold',
+
+
+      '--p-togglebutton-checked-background': 'inherited',
+      '--p-togglebutton-checked-hover-background': bg,
+      '--p-togglebutton-checked-color': fg,
+      '--p-togglebutton-checked-border-color': 'inherited',// bg,
+      '--p-togglebutton-content-checked-background': bg,
+
+      '--p-togglebutton-background': 'inherited',//'var(--p-tag-secondary-background)',
+      '--p-togglebutton-hover-background': 'var(--p-tag-secondary-background)',
+      '--p-togglebutton-color': 'var(--p-tag-secondary-color)',
+      '--p-togglebutton-border-color': 'inherited',//'var(--p-tag-secondary-background)',
+      '--p-togglebutton-content-background': 'var(--p-tag-secondary-background)',
+    };
   }
 
   /**
@@ -662,9 +664,9 @@ export class BankTransactionsComponent implements OnInit {
   private build_active_exceptions(): FilterException[] {
     const tag_exceptions: FilterException[] = Object.entries(this.selected_tag_map)
       .filter(([, enabled]) => !enabled)
-      .map(([tag_name]) => ({
+      .map(([tag_combo]) => ({
         combinator: 'AND NOT',
-        conditions: [{field: 'tag', operator: 'eq', value: tag_name}],
+        conditions: [{field: 'tag', operator: 'eq', value: tag_combo.split("+")[1], severity: tag_combo.split("+")[0]}],
       } as FilterException));
 
     return [...this.exceptions, ...tag_exceptions];
@@ -690,8 +692,9 @@ export class BankTransactionsComponent implements OnInit {
     this.transactions = t_list || [];
     t_list.forEach((t) =>
       t.tags.forEach((tag) => {
-        if (!(tag.tag in this.selected_tag_map)) {
-          this.selected_tag_map[tag.tag] = true;
+        const key = tag.severity + '+' + tag.tag;
+        if (!(key in this.selected_tag_map)) {
+          this.selected_tag_map[key] = true;
         }
       })
     );
@@ -746,8 +749,9 @@ export class BankTransactionsComponent implements OnInit {
 
         for (const ntag of new_tags) {
           this.tags.add(ntag);
-          if (!(ntag.tag in this.selected_tag_map)) {
-            this.selected_tag_map[ntag.tag] = true;
+          const key = ntag.severity + '+' + ntag.tag;
+          if (!(key in this.selected_tag_map)) {
+            this.selected_tag_map[key] = true;
           }
         }
         // update unique tag list once after loop

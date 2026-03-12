@@ -16,11 +16,14 @@
       </p-tabpanel>
       <p-tabpanel value="1">
         <div class="flex flex-wrap gap-2 mb-2 items-center">
-          <p-button  size="small" pTooltip="Додати тег" [rounded]="true" [outlined]="true" icon="pi pi-plus" (onClick)="open_add_tag_dialog()" />
-          <p-button  size="small" pTooltip="Видалити тег" [rounded]="true" [outlined]="true" severity="danger" icon="pi pi-trash" (onClick)="open_delete_tag_dialog()" />
+          <p-button size="small" pTooltip="Додати тег" [rounded]="true" [outlined]="true" icon="pi pi-plus"
+                    (onClick)="open_add_tag_dialog()"/>
+          <p-button size="small" pTooltip="Видалити тег" [rounded]="true" [outlined]="true" severity="danger"
+                    icon="pi pi-trash" (onClick)="open_delete_tag_dialog()"/>
           @for (tag of tags; track tag) {
+            @let key = tag.severity + '+' + tag.tag;
             <p-toggleButton
-              [(ngModel)]="selected_tag_map[tag.tag]"
+              [(ngModel)]="selected_tag_map[key]"
               [onLabel]="tag.tag"
               [offLabel]="tag.tag"
               [style]="tag_toggle_style(tag.severity)"
@@ -69,7 +72,7 @@
               <td>{{ transaction.description }}</td>
               <td>{{ transaction.mcc }}</td>
               <td>{{ transaction.mcc_description }}</td>
-              <td >
+              <td>
                 @for (tag of transaction.tags; track tag) {
                   <p-tag class="ml-2" [severity]="$any(tag.severity)" [value]="tag.tag"/>
                 }
@@ -108,7 +111,7 @@
               [dropdown]="true"
               appendTo="body"
               placeholder="Назва тегу"
-              (completeMethod)="search($event)" />
+              (completeMethod)="search($event)"/>
             @if (row.get('tag')?.invalid && row.get('tag')?.touched) {
               <small class="text-red-500">Введіть назву тегу</small>
             }
@@ -132,7 +135,7 @@
             size="small"
             type="button"
             [disabled]="tag_rows.length === 1"
-            (onClick)="remove_tag_row($index)" />
+            (onClick)="remove_tag_row($index)"/>
         </div>
       }
     </div>
@@ -145,7 +148,7 @@
         [outlined]="true"
         size="small"
         type="button"
-        (onClick)="add_tag_row()" />
+        (onClick)="add_tag_row()"/>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">
@@ -154,11 +157,11 @@
         severity="secondary"
         [outlined]="true"
         type="button"
-        (onClick)="show_add_tag_dialog = false" />
+        (onClick)="show_add_tag_dialog = false"/>
       <p-button
         label="Додати"
         type="submit"
-        [disabled]="batch_tag_form.invalid" />
+        [disabled]="batch_tag_form.invalid"/>
     </div>
 
   </form>
@@ -185,7 +188,7 @@
               [dropdown]="true"
               appendTo="body"
               placeholder="Назва тегу"
-              (completeMethod)="search($event)" />
+              (completeMethod)="search($event)"/>
             @if (row.get('tag')?.invalid && row.get('tag')?.touched) {
               <small class="text-red-500">Введіть назву тегу</small>
             }
@@ -209,7 +212,7 @@
             size="small"
             type="button"
             [disabled]="delete_tag_rows.length === 1"
-            (onClick)="remove_delete_tag_row($index)" />
+            (onClick)="remove_delete_tag_row($index)"/>
         </div>
       }
     </div>
@@ -222,7 +225,7 @@
         [outlined]="true"
         size="small"
         type="button"
-        (onClick)="add_delete_tag_row()" />
+        (onClick)="add_delete_tag_row()"/>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">
@@ -231,12 +234,12 @@
         severity="secondary"
         [outlined]="true"
         type="button"
-        (onClick)="show_delete_tag_dialog = false" />
+        (onClick)="show_delete_tag_dialog = false"/>
       <p-button
         label="Видалити"
         severity="danger"
         type="submit"
-        [disabled]="batch_delete_tag_form.invalid" />
+        [disabled]="batch_delete_tag_form.invalid"/>
     </div>
 
   </form>
