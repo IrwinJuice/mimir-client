@@ -1,10 +1,10 @@
-import {Component, EventEmitter, inject, Input, OnInit, Output} from '@angular/core';
+import {ChangeDetectorRef, Component, DestroyRef, EventEmitter, inject, Input, OnInit, Output} from '@angular/core';
 import {Button} from 'primeng/button';
 import {Select} from 'primeng/select';
 import {InputText} from 'primeng/inputtext';
 import {Tooltip} from 'primeng/tooltip';
 import {Fieldset} from 'primeng/fieldset';
-import {FormArray, FormBuilder, FormGroup, ReactiveFormsModule} from '@angular/forms';
+import {FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
   FilterCondition,
   FilterException,
@@ -21,7 +21,9 @@ import {
   STRING_OPERATORS,
   TAG_OPERATORS
 } from '../../service/account.service';
-import {NgClass} from '@angular/common';
+import {AutoComplete, AutoCompleteCompleteEvent} from 'primeng/autocomplete';
+import {debounceTime, Subject, switchMap, tap} from 'rxjs';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 
 /**
  * UI component for building and applying exception-based transaction filters.
@@ -43,15 +45,22 @@ import {NgClass} from '@angular/common';
     Fieldset,
     Tooltip,
     ReactiveFormsModule,
-    NgClass,
+    AutoComplete,
 
   ],
   templateUrl: './filter.html',
   styleUrl: './filter.scss',
 })
 export class Filter implements OnInit {
+  private dr = inject(DestroyRef);
   private fb = inject(FormBuilder);
   private t_service = inject(TransactionService);
+  private cd = inject(ChangeDetectorRef);
+
+  /**
+   * Available severity that can be selected for a tag.
+   */
+  readonly severity_options: Severity[] = SEVERITY_OPTIONS;
 
   /**
    * Available fields that can be selected for a filter condition.
@@ -62,6 +71,9 @@ export class Filter implements OnInit {
    * Supported logical combinators for exception groups.
    */
   combinators = COMBINATORS;
+
+  tags_suggestions: string[] = [];
+  all_tag_names: string[] = [];
 
   /**
    * Root reactive form that stores all exception groups.
@@ -74,6 +86,8 @@ export class Filter implements OnInit {
   exceptions_form: FormGroup = this.fb.group({
     exceptions: this.fb.array([])
   });
+
+  private search$ = new Subject<string>();
 
   /**
    * Cached exception list received from the parent component.
@@ -102,7 +116,9 @@ export class Filter implements OnInit {
             const field = FILTER_FIELDS.find(f => f.value === c.field) ?? null;
             const operator_list = field?.type === 'number' ? NUMBER_OPERATORS : (field?.type === 'string' ? STRING_OPERATORS : TAG_OPERATORS);
             const operator = operator_list.find(o => o.value === c.operator) ?? null;
-            return this.new_condition_group(field, operator, c.value);
+            const value = c.value;
+            const severity = SEVERITY_OPTIONS.find(s => s.value === c.severity) ?? null;
+            return this.new_condition_group(field, operator, value, severity);
           });
         const group = this.fb.group({
           combinator: [ex.combinator ?? 'AND NOT'],
@@ -118,6 +134,24 @@ export class Filter implements OnInit {
    */
   ngOnInit() {
     this.exChange.emit(this.build_exceptions());
+
+    this.search$
+      .pipe(
+        takeUntilDestroyed(this.dr),
+        debounceTime(300),
+        switchMap(query =>
+          this.t_service.get_all_transactions_tags_name().pipe(
+            tap(tags => {
+              this.all_tag_names = tags;
+              this.tags_suggestions = query
+                ? this.all_tag_names.filter(t => t.toLowerCase().includes(query))
+                : [...this.all_tag_names];
+              this.cd.detectChanges();
+            }),
+          )
+        ),
+      )
+      .subscribe();
   }
 
   /**
@@ -160,7 +194,9 @@ export class Filter implements OnInit {
    */
   on_field_change(group_index: number, cond_index: number) {
     const cond = this.get_conditions(group_index).at(cond_index);
-    const has_field = !!cond.get('field')?.value;
+    const field: FilterField | null = cond.get('field')?.value;
+    const has_field = !!field;
+    const is_tag = field?.type === 'tag';
     const operator_ctrl = cond.get('operator')!;
     const value_ctrl = cond.get('value')!;
     const severity_ctrl = cond.get('severity')!;
@@ -173,6 +209,13 @@ export class Filter implements OnInit {
       value_ctrl.disable();
       severity_ctrl.disable();
     }
+
+    if (is_tag) {
+      severity_ctrl.setValidators(Validators.required);
+    } else {
+      severity_ctrl.clearValidators();
+    }
+    severity_ctrl.updateValueAndValidity();
 
     cond.patchValue({operator: null, value: ''});
   }
@@ -195,13 +238,31 @@ export class Filter implements OnInit {
    */
   private new_condition_group(field: FilterField | null = null, operator: FilterOperator | null = null, value = '', severity: Severity | null = null) {
     const has_field = !!field;
+    const is_tag = field?.type === 'tag';
     return this.fb.group({
-      field: [field],
-      operator: [{value: operator, disabled: !has_field}],
-      value: [{value: value, disabled: !has_field}],
-      severity: [{value: severity, disabled: !has_field}],
+      field: [field, Validators.required],
+      operator: [{value: operator, disabled: !has_field}, Validators.required],
+      value: [{value: value, disabled: !has_field}, Validators.required],
+      severity: [{value: severity, disabled: !has_field}, is_tag ? Validators.required : []],
     });
   }
+
+  /**
+   * Explicitly patches the combinator value on the exception group form.
+   * This works around a PrimeNG Select issue where optionValue does not
+   * reliably propagate changes through the ControlValueAccessor.
+   *
+   * @param group_index Index of the exception group.
+   * @param value The selected combinator string value.
+   */
+  on_combinator_change(group_index: number, value: string) {
+    this.exceptions.at(group_index).get('combinator')!.setValue(value);
+    console.log(this.exceptions.at(group_index))
+  }
+
+  // on_severity_change(group_index: number, cond_index: number, value: string) {
+  //   this.get_conditions(group_index).at(cond_index).get('severity')!.setValue(value);
+  // }
 
   /**
    * Adds a new empty filter exception group to the form.
@@ -214,7 +275,6 @@ export class Filter implements OnInit {
     this.exceptions.push(group);
   }
 
-  readonly severity_options: Severity[] = SEVERITY_OPTIONS;
 
   /**
    * Removes a filter exception group by index.
@@ -267,11 +327,13 @@ export class Filter implements OnInit {
           .map(raw => ({
             field: (raw.field as FilterField).value,
             operator: (raw.operator as FilterOperator).value,
-            value: String(raw.value),
+            value: raw.value,
+            severity: (raw.field as FilterField).type === 'tag' ? (raw.severity as Severity)?.value ?? null : null
           }));
         return {combinator: group.get('combinator')!.value as string, conditions: built} as FilterException;
       })
       .filter(ex => ex.conditions.length > 0);
+
   }
 
   /**
@@ -280,6 +342,11 @@ export class Filter implements OnInit {
   apply_exceptions() {
     const data = this.build_exceptions();
     this.t_service.save_exceptions_to_storage(data);
-    this.exChange.emit(this.build_exceptions());
+    this.exChange.emit(data);
+  }
+
+  search($event: AutoCompleteCompleteEvent) {
+    const query = ($event.query ?? '').toLowerCase();
+    this.search$.next(query);
   }
 }

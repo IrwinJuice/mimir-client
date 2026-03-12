@@ -2,7 +2,7 @@ import {ChangeDetectorRef, Component, DestroyRef, effect, inject, OnInit} from '
 import {ChartModule} from 'primeng/chart';
 import {FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators} from '@angular/forms';
 import {Mcc, MccService} from '../../service/mcc.service';
-import {of, skip, switchMap, take, tap} from 'rxjs';
+import {debounceTime, of, skip, Subject, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
   BankTransactionFilter, EXCEPTIONS_STORAGE_KEY,
@@ -84,6 +84,8 @@ export class BankTransactionsComponent implements OnInit {
   batch_tag_form = this.fb.group({
     rows: this.fb.array([this.create_tag_row()]),
   });
+
+  private search$ = new Subject<string>();
 
   get tag_rows() {
     return this.batch_tag_form.get('rows') as FormArray;
@@ -220,16 +222,16 @@ export class BankTransactionsComponent implements OnInit {
     const f: FilterException = {
       combinator: 'AND NOT',
       conditions: [
-        {field: mcc_field.value, operator: eq_num.value, value: '4829'},
-        {field: desc_field.value, operator: eq_str.value, value: 'Переказ на картку'},
+        {field: mcc_field.value, operator: eq_num.value, value: '4829', severity: null},
+        {field: desc_field.value, operator: eq_str.value, value: 'Переказ на картку', severity: null},
       ]
     }
 
     const s: FilterException = {
       combinator: 'AND NOT',
       conditions: [
-        {field: mcc_field.value, operator: eq_num.value, value: '4829'},
-        {field: desc_field.value, operator: eq_str.value, value: 'З Білої картки'},
+        {field: mcc_field.value, operator: eq_num.value, value: '4829', severity: null},
+        {field: desc_field.value, operator: eq_str.value, value: 'З Білої картки', severity: null},
       ]
     }
 
@@ -242,9 +244,6 @@ export class BankTransactionsComponent implements OnInit {
       tap((tags) => {
         this.tags.clear();
         tags.forEach(t => this.tags.add(t));
-        // Keep unique suggestions by tag name
-        this.all_tag_names = [...new Set([...this.tags].map(t => t.tag))];
-        this.tags_suggestions = [...this.all_tag_names];
       }),
       take(1),
     ).subscribe()
@@ -332,6 +331,23 @@ export class BankTransactionsComponent implements OnInit {
       }),
     ).subscribe();
 
+    this.search$
+      .pipe(
+        takeUntilDestroyed(this.dr),
+        debounceTime(300),
+        switchMap(query =>
+          this.t_service.get_all_transactions_tags_name().pipe(
+            tap(tags => {
+              this.all_tag_names = tags;
+              this.tags_suggestions = query
+                ? this.all_tag_names.filter(t => t.toLowerCase().includes(query))
+                : [...this.all_tag_names];
+              this.cd.detectChanges();
+            }),
+          )
+        ),
+      )
+      .subscribe();
   }
 
   to_uk_date(date: string) {
@@ -750,11 +766,9 @@ export class BankTransactionsComponent implements OnInit {
     ).subscribe();
   }
 
-  protected search($event: AutoCompleteCompleteEvent) {
+  search($event: AutoCompleteCompleteEvent) {
     const query = ($event.query ?? '').toLowerCase();
-    this.tags_suggestions = query
-      ? this.all_tag_names.filter(t => t.toLowerCase().includes(query))
-      : [...this.all_tag_names];
+    this.search$.next(query);
   }
 
   submit_delete_tag() {
@@ -866,5 +880,6 @@ export class BankTransactionsComponent implements OnInit {
     this.cd.detectChanges();
 
   }
+
 }
 

@@ -36,6 +36,8 @@ export interface FilterCondition {
   field: string;      // 'amount' | 'currency' | 'description' | 'receipt_id' | 'mcc'
   operator: string;   // 'eq' | 'neq' | 'lt' | 'gt' | 'lte' | 'gte' | 'startsWith' | 'endsWith' | 'contains'
   value: string;
+/// Severity values: primary | secondary | success | info | warn | danger | contrast
+  severity: string;
 }
 
 // One exception = combinator + (cond1 AND cond2 AND ...)
@@ -199,6 +201,16 @@ export class TransactionService {
   get_all_transactions_tags(): Observable<TransactionTag[]> {
     const url = `${environment.apiBase}/tags`;
     return this.http.get<TransactionTag[]>(url).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
+        return of(null);
+      })
+    );
+  }
+
+  get_all_transactions_tags_name(): Observable<string[]> {
+    const url = `${environment.apiBase}/tags/names`;
+    return this.http.get<string[]>(url).pipe(
       catchError(error => {
         this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
