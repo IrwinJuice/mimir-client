@@ -4,8 +4,10 @@ import {HttpClient} from '@angular/common/http';
 import {catchError, Observable, of, Subject, tap} from 'rxjs';
 import {environment} from '../../environments/environment';
 
+export const EXCEPTIONS_STORAGE_KEY = 'bank_transaction_exceptions';
+
 export interface BankTransaction {
-  id: string,
+  idt: string,
   external_id: string,
   ida: number,
   amount: number,
@@ -20,20 +22,45 @@ export interface BankTransaction {
   receipt_id: string | null,
   balance: number | null,
 
+  tags: TransactionTag[]
+}
+
+/// A single tag.
+/// Severity values: primary | secondary | success | info | warn | danger | contrast
+export interface TransactionTag {
+  tag: string,
+  severity: string,
 }
 
 export interface FilterCondition {
   field: string;      // 'amount' | 'currency' | 'description' | 'receipt_id' | 'mcc'
   operator: string;   // 'eq' | 'neq' | 'lt' | 'gt' | 'lte' | 'gte' | 'startsWith' | 'endsWith' | 'contains'
   value: string;
+/// Severity values: primary | secondary | success | info | warn | danger | contrast
+  severity: string;
 }
 
 // One exception = combinator + (cond1 AND cond2 AND ...)
 // combinator examples: 'AND NOT', 'AND', 'OR NOT', 'OR'
 export interface FilterException {
+  enabled?: boolean;   // defaults to true; false = group is saved but skipped
   combinator: string;
   conditions: FilterCondition[];
 }
+
+export interface Severity {
+  label: string,
+  value: string
+}
+
+export const SEVERITY_OPTIONS: Severity[] = [
+  {label: 'Primary', value: 'primary'},
+  {label: 'Success', value: 'success'},
+  {label: 'Info', value: 'info'},
+  {label: 'Warn', value: 'warn'},
+  {label: 'Danger', value: 'danger'},
+  {label: 'Contrast', value: 'contrast'},
+];
 
 export interface BankTransactionFilter {
   ida_list: number[],
@@ -41,6 +68,11 @@ export interface BankTransactionFilter {
   exceptions?: FilterException[],
   from: string | number,
   to: string | number
+}
+
+interface BankTransactionTag {
+  idt: string,
+  tags: TransactionTag[]
 }
 
 @Injectable({
@@ -71,7 +103,7 @@ export class TransactionService {
     return this.http.post<BankTransaction[]>(url, filter).pipe(
       tap((ts) => this.current_transactions = ts),
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of([] as BankTransaction[]);
       })
     );
@@ -83,7 +115,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/transactions/csv`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     ).subscribe(response => {
@@ -113,7 +145,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/transactions/xlsx`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     ).subscribe(response => {
@@ -143,7 +175,7 @@ export class TransactionService {
     const url = `${environment.apiBase}/transactions/json`;
     this.http.post(url, filter, {responseType: 'blob', observe: 'response'}).pipe(
       catchError(error => {
-        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error}`});
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
         return of(null);
       })
     ).subscribe(response => {
@@ -166,4 +198,50 @@ export class TransactionService {
       URL.revokeObjectURL(url);
     });
   }
+
+  get_all_transactions_tags(): Observable<TransactionTag[]> {
+    const url = `${environment.apiBase}/tags`;
+    return this.http.get<TransactionTag[]>(url).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
+        return of(null);
+      })
+    );
+  }
+
+  get_all_transactions_tags_name(): Observable<string[]> {
+    const url = `${environment.apiBase}/tags/names`;
+    return this.http.get<string[]>(url).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
+        return of(null);
+      })
+    );
+  }
+
+  add_transactions_tags(tags: BankTransactionTag[]): Observable<BankTransactionTag[]> {
+    const url = `${environment.apiBase}/tags/batch_insert`;
+    return this.http.post<BankTransactionTag[]>(url, tags).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
+        return of([]);
+      }));
+  }
+
+  delete_transactions_tags(tags: BankTransactionTag[]): Observable<BankTransactionTag[]> {
+    const url = `${environment.apiBase}/tags/batch_delete`;
+    return this.http.post<BankTransactionTag[]>(url, tags).pipe(
+      catchError(error => {
+        this.message.add({severity: 'error', summary: 'Error', detail: `${error.error.message}`});
+        return of([]);
+      }));
+  }
+
+  /**
+   * Saves the current exception list to local storage.
+   */
+  save_exceptions_to_storage(data: FilterException[]): void {
+    localStorage.setItem(EXCEPTIONS_STORAGE_KEY, JSON.stringify(data));
+  }
+
 }

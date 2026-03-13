@@ -100,9 +100,10 @@
                   }
                   <span [style.color]="rowData['color']"><b>{{ rowData[col.field] }}</b></span>
                   @if (rowData['account']) {
-                    <p-button icon="pi pi-pencil" [text]="true" size="small"
+                    <p-button icon="pi pi-pencil" [rounded]="true" [outlined]="true" size="small"
                               (click)="edit_account(rowData['ida'])"/>
-                    <p-button icon="pi pi-trash" severity="danger" [text]="true" size="small"
+                    <p-button icon="pi pi-trash" severity="danger" [rounded]="true" [outlined]="true"
+                              size="small"
                               (click)="delete_account(rowData['ida'])"/>
                   }
                 </div>

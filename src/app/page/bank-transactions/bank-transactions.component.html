@@ -15,47 +15,72 @@
                    [options]="options"></ag-charts>
       </p-tabpanel>
       <p-tabpanel value="1">
+        <div class="flex flex-wrap gap-2 mb-2 items-center">
+          <p-button size="small" pTooltip="Додати тег" [rounded]="true" [outlined]="true" icon="pi pi-plus"
+                    (onClick)="open_add_tag_dialog()"/>
+          <p-button size="small" pTooltip="Видалити тег" [rounded]="true" [outlined]="true" severity="danger"
+                    icon="pi pi-trash" (onClick)="open_delete_tag_dialog()"/>
+          @for (item of tags_list; track item.key) {
+            <p-toggleButton
+              [(ngModel)]="selected_tag_map[item.key]"
+              [onLabel]="item.tag"
+              [offLabel]="item.tag"
+              [style]="tag_toggle_style(item.severity)"
+              size="small"
+              (onChange)="on_tag_toggle()"/>
+          }
+        </div>
         <p-table [value]="transactions"
-                 [tableStyle]="{ 'min-width': '50rem' } "
+                 [tableStyle]="{ 'min-width': '150rem' } "
                  [paginator]="true"
                  [showCurrentPageReport]="true"
                  currentPageReportTemplate="Showing {first} to {last} of {totalRecords} entries"
-                 [rows]="50"
-                 [rowsPerPageOptions]="[10, 50, 100, 200]">
+                 [rows]="10"
+                 [rowsPerPageOptions]="[10, 50, 100, 200]"
+                 paginatorDropdownAppendTo="body"
+                 selectionMode="multiple"
+                 [(selection)]="selected_transactions"
+                 dataKey="idt">
           <ng-template #header>
             <tr>
+              <th style="width: 3rem">
+                <p-tableHeaderCheckbox/>
+              </th>
               <th>Mask</th>
-              <th>Bank Acc. ID</th>
               <th>Amount</th>
               <th>Currency</th>
-              <!--                <th>Currency Code</th>-->
               <th>Description</th>
-<!--              <th>T. time</th>-->
-              <th>Receipt ID</th>
               <th>MCC</th>
               <th>MCC Description</th>
-              <!--                <th>ID</th>-->
-              <!--                <th>IDA</th>-->
-              <th>Hold</th>
+              <th>Tags</th>
+              <th>T. time</th>
               <th>Balance</th>
+              <th>Hold</th>
+              <th>Receipt ID</th>
+              <th>Bank Acc. ID</th>
             </tr>
           </ng-template>
           <ng-template #body let-transaction>
-            <tr>
+            <tr [pSelectableRow]="transaction">
+              <td>
+                <p-tableCheckbox [value]="transaction"/>
+              </td>
               <td>{{ transaction.masked_pan }}</td>
-              <td>{{ transaction.external_id }}</td>
               <td>{{ transaction.amount / 100 }}</td>
               <td>{{ transaction.currency }}</td>
-              <!--                <td>{{ transaction.currency_code }}</td>-->
               <td>{{ transaction.description }}</td>
-<!--              <td>{{ to_uk_date(transaction.transaction_time) }}</td>-->
-              <td>{{ transaction.receipt_id }}</td>
               <td>{{ transaction.mcc }}</td>
               <td>{{ transaction.mcc_description }}</td>
-              <!--                <td>{{ transaction.id }}</td>-->
-              <!--                <td>{{ transaction.ida }}</td>-->
-              <td>{{ transaction.hold }}</td>
+              <td>
+                @for (tag of transaction.tags; track tag) {
+                  <p-tag class="m-1" [severity]="$any(tag.severity)" [value]="tag.tag"/>
+                }
+              </td>
+              <td>{{ to_uk_date(transaction.transaction_time) }}</td>
               <td>{{ transaction.balance }}</td>
+              <td>{{ transaction.hold }}</td>
+              <td>{{ transaction.receipt_id }}</td>
+              <td>{{ transaction.external_id }}</td>
             </tr>
           </ng-template>
         </p-table>
@@ -63,3 +88,158 @@
     </p-tabpanels>
   </p-tabs>
 </div>
+
+<p-dialog
+  header="Додати теги до вибраних транзакцій"
+  [(visible)]="show_add_tag_dialog"
+  [modal]="true"
+  [style]="{ width: '520px' }"
+  [draggable]="false"
+  [resizable]="false">
+
+  <form [formGroup]="batch_tag_form" (ngSubmit)="submit_add_tag()" class="flex flex-col gap-3 pt-2">
+
+    <div formArrayName="rows" class="flex flex-col gap-2">
+      @for (row of tag_rows.controls; track $index) {
+        <div [formGroupName]="$index" class="flex gap-2 items-start">
+
+          <div class="flex flex-col gap-1 flex-1">
+            <p-autoComplete
+              formControlName="tag"
+              [suggestions]="tags_suggestions"
+              [dropdown]="true"
+              appendTo="body"
+              placeholder="Назва тегу"
+              (completeMethod)="search($event)"/>
+            @if (row.get('tag')?.invalid && row.get('tag')?.touched) {
+              <small class="text-red-500">Введіть назву тегу</small>
+            }
+          </div>
+
+          <p-select
+            formControlName="severity"
+            [options]="severity_options"
+            optionLabel="label"
+            optionValue="value"
+            appendTo="body"
+            placeholder="Серйозність"
+            class="w-40"
+          />
+
+          <p-button
+            icon="pi pi-trash"
+            severity="danger"
+            [outlined]="true"
+            [rounded]="true"
+            size="small"
+            type="button"
+            [disabled]="tag_rows.length === 1"
+            (onClick)="remove_tag_row($index)"/>
+        </div>
+      }
+    </div>
+
+    <div>
+      <p-button
+        icon="pi pi-plus"
+        label="Ще рядок"
+        severity="secondary"
+        [outlined]="true"
+        size="small"
+        type="button"
+        (onClick)="add_tag_row()"/>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <p-button
+        label="Скасувати"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="show_add_tag_dialog = false"/>
+      <p-button
+        label="Додати"
+        type="submit"
+        [disabled]="batch_tag_form.invalid"/>
+    </div>
+
+  </form>
+</p-dialog>
+
+<p-dialog
+  header="Видалити теги з вибраних транзакцій"
+  [(visible)]="show_delete_tag_dialog"
+  [modal]="true"
+  [style]="{ width: '520px' }"
+  [draggable]="false"
+  [resizable]="false">
+
+  <form [formGroup]="batch_delete_tag_form" (ngSubmit)="submit_delete_tag()" class="flex flex-col gap-3 pt-2">
+
+    <div formArrayName="rows" class="flex flex-col gap-2">
+      @for (row of delete_tag_rows.controls; track $index) {
+        <div [formGroupName]="$index" class="flex gap-2 items-start">
+
+          <div class="flex flex-col gap-1 flex-1">
+            <p-autoComplete
+              formControlName="tag"
+              [suggestions]="tags_suggestions"
+              [dropdown]="true"
+              appendTo="body"
+              placeholder="Назва тегу"
+              (completeMethod)="search($event)"/>
+            @if (row.get('tag')?.invalid && row.get('tag')?.touched) {
+              <small class="text-red-500">Введіть назву тегу</small>
+            }
+          </div>
+
+          <p-select
+            formControlName="severity"
+            [options]="severity_options"
+            optionLabel="label"
+            optionValue="value"
+            appendTo="body"
+            placeholder="Серйозність"
+            class="w-40"
+          />
+
+          <p-button
+            icon="pi pi-trash"
+            severity="danger"
+            [outlined]="true"
+            [rounded]="true"
+            size="small"
+            type="button"
+            [disabled]="delete_tag_rows.length === 1"
+            (onClick)="remove_delete_tag_row($index)"/>
+        </div>
+      }
+    </div>
+
+    <div>
+      <p-button
+        icon="pi pi-plus"
+        label="Ще рядок"
+        severity="secondary"
+        [outlined]="true"
+        size="small"
+        type="button"
+        (onClick)="add_delete_tag_row()"/>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <p-button
+        label="Скасувати"
+        severity="secondary"
+        [outlined]="true"
+        type="button"
+        (onClick)="show_delete_tag_dialog = false"/>
+      <p-button
+        label="Видалити"
+        severity="danger"
+        type="submit"
+        [disabled]="batch_delete_tag_form.invalid"/>
+    </div>
+
+  </form>
+</p-dialog>
