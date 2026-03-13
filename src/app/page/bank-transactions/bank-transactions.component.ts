@@ -5,16 +5,14 @@ import {Mcc, MccService} from '../../service/mcc.service';
 import {debounceTime, of, skip, Subject, switchMap, take, tap} from 'rxjs';
 import {
   BankTransaction,
-  BankTransactionFilter, EXCEPTIONS_STORAGE_KEY,
-  FilterException, SEVERITY_OPTIONS,
+  BankTransactionFilter,
+  EXCEPTIONS_STORAGE_KEY,
+  FilterException,
+  SEVERITY_OPTIONS,
   TransactionService,
   TransactionTag
 } from '../../service/transaction.service';
-import {
-  FILTER_FIELDS,
-  NUMBER_OPERATORS,
-  STRING_OPERATORS,
-} from '../../service/account.service';
+import {FILTER_FIELDS, NUMBER_OPERATORS, STRING_OPERATORS,} from '../../service/account.service';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {DateTimeService} from '../../service/date-time.service';
 import {MessageService} from 'primeng/api';
@@ -74,7 +72,11 @@ export class BankTransactionsComponent implements OnInit {
 
   mcc_list: Mcc[] = [];
   transactions: BankTransaction[] = [];
-  tags = new Set<TransactionTag>();
+
+  tags = new Map<string, TransactionTag>();
+  get tags_list(): { key: string; tag: string; severity: string }[] {
+    return [...this.tags.values()].map(t => ({ key: t.severity + '+' + t.tag, tag: t.tag, severity: t.severity }));
+  }
   all_tag_names: string[] = [];
   tags_suggestions: string[] = [];
   selected_transactions: BankTransaction[] = [];
@@ -87,49 +89,18 @@ export class BankTransactionsComponent implements OnInit {
 
   private search$ = new Subject<string>();
 
-  get tag_rows() {
-    return this.batch_tag_form.get('rows') as FormArray;
-  }
-
-  private create_tag_row() {
-    return this.fb.group({
-      tag: ['', [Validators.required, Validators.minLength(1)]],
-      severity: ['primary', Validators.required],
-    });
-  }
-
-  add_tag_row() {
-    this.tag_rows.push(this.create_tag_row());
-  }
-
-  remove_tag_row(index: number) {
-    if (this.tag_rows.length > 1) this.tag_rows.removeAt(index);
-  }
-
   show_delete_tag_dialog = false;
   batch_delete_tag_form = this.fb.group({
     rows: this.fb.array([this.create_delete_tag_row()]),
   });
 
+  get tag_rows() {
+    return this.batch_tag_form.get('rows') as FormArray;
+  }
+
   get delete_tag_rows() {
     return this.batch_delete_tag_form.get('rows') as FormArray;
   }
-
-  private create_delete_tag_row() {
-    return this.fb.group({
-      tag: ['', [Validators.required, Validators.minLength(1)]],
-      severity: ['primary', Validators.required],
-    });
-  }
-
-  add_delete_tag_row() {
-    this.delete_tag_rows.push(this.create_delete_tag_row());
-  }
-
-  remove_delete_tag_row(index: number) {
-    if (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(index);
-  }
-
 
 
   data = {labels: [], datasets: []};
@@ -165,11 +136,41 @@ export class BankTransactionsComponent implements OnInit {
     });
   }
 
+
+  private create_tag_row() {
+    return this.fb.group({
+      tag: ['', [Validators.required, Validators.minLength(1)]],
+      severity: ['primary', Validators.required],
+    });
+  }
+
+  add_tag_row() {
+    this.tag_rows.push(this.create_tag_row());
+  }
+
+  remove_tag_row(index: number) {
+    if (this.tag_rows.length > 1) this.tag_rows.removeAt(index);
+  }
+
+  private create_delete_tag_row() {
+    return this.fb.group({
+      tag: ['', [Validators.required, Validators.minLength(1)]],
+      severity: ['primary', Validators.required],
+    });
+  }
+
+  add_delete_tag_row() {
+    this.delete_tag_rows.push(this.create_delete_tag_row());
+  }
+
+  remove_delete_tag_row(index: number) {
+    if (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(index);
+  }
+
   // Maps a PrimeNG tag severity to togglebutton design-token overrides.
   // Checked (on)  → full severity color.
   // Unchecked (off) → secondary / muted.
   tag_toggle_style(severity: string): Record<string, string> {
-    console.log(this.selected_tag_map)
     const bg = `var(--p-tag-${severity}-background)`;
     const fg = `var(--p-tag-${severity}-color)`;
     return {
@@ -244,8 +245,12 @@ export class BankTransactionsComponent implements OnInit {
 
     this.t_service.get_all_transactions_tags().pipe(
       tap((tags) => {
+        if (!tags) return;
         this.tags.clear();
-        tags.forEach(t => this.tags.add(t));
+        tags.forEach(t => {
+          const key = `${t.severity}+${t.tag}`;
+          this.tags.set(key, t);
+        });
       }),
       take(1),
     ).subscribe()
@@ -264,9 +269,9 @@ export class BankTransactionsComponent implements OnInit {
         // - `from`: the start of the selected day in the local timezone (00:00:00 local) converted to UTC
         // - `to`: the end of the selected day in the local timezone (23:59:59.999 local) converted to UTC
         const from_iso_date = DateTime.fromJSDate(time_range[0], {zone: 'local'}).toISODate();
-        const from_dt =DateTime.fromISO(from_iso_date, { zone: 'utc' }).startOf('day');
+        const from_dt = DateTime.fromISO(from_iso_date, {zone: 'utc'}).startOf('day');
         const to_iso_date = DateTime.fromJSDate(time_range[1], {zone: 'local'}).toISODate();
-        const to_dt =DateTime.fromISO(to_iso_date, { zone: 'utc' }).endOf('day');
+        const to_dt = DateTime.fromISO(to_iso_date, {zone: 'utc'}).endOf('day');
 
         const from = Math.floor(from_dt.toSeconds());
         const to = Math.floor(to_dt.toSeconds());
@@ -298,9 +303,9 @@ export class BankTransactionsComponent implements OnInit {
         // - `from`: the start of the selected day in the local timezone (00:00:00 local) converted to UTC
         // - `to`: the end of the selected day in the local timezone (23:59:59.999 local) converted to UTC
         const from_iso_date = DateTime.fromJSDate(time_range[0], {zone: 'local'}).toISODate();
-        const from_dt =DateTime.fromISO(from_iso_date, { zone: 'utc' }).startOf('day');
+        const from_dt = DateTime.fromISO(from_iso_date, {zone: 'utc'}).startOf('day');
         const to_iso_date = DateTime.fromJSDate(time_range[1], {zone: 'local'}).toISODate();
-        const to_dt =DateTime.fromISO(to_iso_date, { zone: 'utc' }).endOf('day');
+        const to_dt = DateTime.fromISO(to_iso_date, {zone: 'utc'}).endOf('day');
 
         const from = Math.floor(from_dt.toSeconds());
         const to = Math.floor(to_dt.toSeconds());
@@ -384,7 +389,188 @@ export class BankTransactionsComponent implements OnInit {
 
   }
 
-  draw_main_chart(t_list: BankTransaction[]) {
+  apply_filter_changes() {
+    const last = this.t_service.last_transactions_filter;
+    if (!last) return;
+
+    const filter: BankTransactionFilter = {
+      ...last,
+      exceptions: this.build_active_exceptions(),
+    };
+    this.t_service.get_transactions(filter).pipe(
+      take(1),
+      tap((t_list) => {
+        this.refill_transactions(t_list);
+      }),
+    ).subscribe();
+  }
+
+  /**
+   * Called whenever a tag toggle button changes state.
+   * Off → adds an AND NOT exception for that tag.
+   * On  → removes the exception.
+   */
+  on_tag_toggle() {
+    this.fetch_with_current_exceptions();
+  }
+
+  /**
+   * Merges the user-defined exceptions with the tag-derived exceptions
+   * and returns the combined list used for every fetch.
+   */
+  private build_active_exceptions(): FilterException[] {
+    const tag_exceptions: FilterException[] = Object.entries(this.selected_tag_map)
+      .filter(([, enabled]) => !enabled)
+      .map(([tag_combo]) => ({
+        combinator: 'AND NOT',
+        conditions: [{field: 'tag', operator: 'eq', value: tag_combo.split("+")[1], severity: tag_combo.split("+")[0]}],
+      } as FilterException));
+
+    return [...this.exceptions, ...tag_exceptions];
+  }
+
+  private fetch_with_current_exceptions() {
+    const last = this.t_service.last_transactions_filter;
+    if (!last) return;
+
+    const filter: BankTransactionFilter = {
+      ...last,
+      exceptions: this.build_active_exceptions(),
+    };
+    this.t_service.get_transactions(filter).pipe(
+      take(1),
+      tap((t_list) => {
+        this.refill_transactions(t_list);
+      }),
+    ).subscribe();
+  }
+
+  private refill_transactions(t_list: BankTransaction[]) {
+    this.transactions = t_list || [];
+    t_list.forEach((t) =>
+      t.tags.forEach((tag) => {
+        const key = tag.severity + '+' + tag.tag;
+        if (!this.tags.has(key)) {
+          this.tags.set(key, tag);
+        }
+        if (!(key in this.selected_tag_map)) {
+          this.selected_tag_map[key] = true;
+        }
+      })
+    );
+    this.on_chart_select(this.chart_idx, t_list);
+    this.cd.detectChanges();
+  }
+
+  open_add_tag_dialog() {
+    if (this.selected_transactions.length === 0) {
+      this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
+      return;
+    }
+    while (this.tag_rows.length > 1) this.tag_rows.removeAt(1);
+    this.tag_rows.at(0).reset({tag: '', severity: 'primary'});
+    this.show_add_tag_dialog = true;
+  }
+
+  open_delete_tag_dialog() {
+    if (this.selected_transactions.length === 0) {
+      this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
+      return;
+    }
+    while (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(1);
+    this.delete_tag_rows.at(0).reset({tag: '', severity: 'primary'});
+    this.show_delete_tag_dialog = true;
+  }
+
+  submit_add_tag() {
+    if (this.batch_tag_form.invalid) return;
+
+    const new_tags: TransactionTag[] = this.batch_tag_form.value.rows as TransactionTag[];
+
+    const payload = this.selected_transactions.map(t => ({
+      idt: t.idt,
+      tags: new_tags,
+    }));
+
+    this.t_service.add_transactions_tags(payload).pipe(
+      take(1),
+      tap((results) => {
+        if (!results || results.length === 0) return;
+
+        // Build a lookup: transaction id → returned tags
+        const tag_map = new Map(results.map(r => [r['idt'], r['tags'] as TransactionTag[]]));
+
+        // Patch tags in place — no refetch needed
+        this.transactions = this.transactions.map(t => {
+          const updated = tag_map.get(t.idt);
+          return updated ? {...t, tags: updated} : t;
+        });
+
+        for (const ntag of new_tags) {
+          const key = ntag.severity + '+' + ntag.tag;
+          this.tags.set(key, ntag);
+          if (!(key in this.selected_tag_map)) {
+            this.selected_tag_map[key] = true;
+          }
+        }
+
+        this.cd.detectChanges();
+        this.show_add_tag_dialog = false;
+        this.message.add({
+          severity: 'success',
+          summary: 'Теги',
+          detail: `${new_tags.length} тег(и) додано до ${results.length} транзакцій.`,
+        });
+      }),
+    ).subscribe();
+  }
+
+  search($event: AutoCompleteCompleteEvent) {
+    const query = ($event.query ?? '').toLowerCase();
+    this.search$.next(query);
+  }
+
+  submit_delete_tag() {
+    if (this.batch_delete_tag_form.invalid) return;
+
+    const tags_to_delete: TransactionTag[] = (this.batch_delete_tag_form.value.rows as {
+      tag: string;
+      severity: string
+    }[])
+      .map(r => ({tag: r.tag, severity: r.severity}));
+
+    const payload = this.selected_transactions.map(t => ({
+      idt: t.idt,
+      tags: tags_to_delete,
+    }));
+
+    this.t_service.delete_transactions_tags(payload).pipe(
+      take(1),
+      tap((results) => {
+        if (!results || results.length === 0) return;
+
+        const tag_map = new Map(results.map(r => [r['idt'], r['tags'] as TransactionTag[]]));
+
+        this.transactions = this.transactions.map(t => {
+          const updated = tag_map.get(t.idt);
+          return updated ? {...t, tags: updated} : t;
+        });
+
+        this.cd.detectChanges();
+        this.show_delete_tag_dialog = false;
+        this.message.add({
+          severity: 'success',
+          summary: 'Теги',
+          detail: `${tags_to_delete.length} тег(и) видалено з ${results.length} транзакцій.`,
+        });
+      }),
+    ).subscribe();
+  }
+
+
+  ////// DRAW
+
+  private draw_main_chart(t_list: BankTransaction[]) {
     const data = t_list.map(t => {
       const amount_key = 'amount_' + t.external_id;
       return {
@@ -464,7 +650,7 @@ export class BankTransactionsComponent implements OnInit {
   }
 
 
-  draw_income_outcome(t_list: BankTransaction[]) {
+  private draw_income_outcome(t_list: BankTransaction[]) {
     // Group transactions by "YYYY-MM" month key
     const groups = Object.groupBy(
       t_list,
@@ -517,7 +703,7 @@ export class BankTransactionsComponent implements OnInit {
     this.cd.detectChanges();
   }
 
-  draw_mcc_group_outcome(t_list: BankTransaction[]) {
+  private draw_mcc_group_outcome(t_list: BankTransaction[]) {
     const with_mcc_group = t_list.map((t) => {
       const mcc_group = this.mcc_list[t.mcc].group;
       return {
@@ -526,14 +712,11 @@ export class BankTransactionsComponent implements OnInit {
       }
     })
 
-
     // Group transactions by MCC
     const groups = Object.groupBy(
       with_mcc_group,
       (t) => t.mcc_group.type
     );
-
-
     // Sum positive amounts (income) per month
     const data = Object.entries(groups)
       .map(([mcc, items]) => {
@@ -560,14 +743,12 @@ export class BankTransactionsComponent implements OnInit {
     this.cd.detectChanges();
   }
 
-
-  draw_mcc_outcome(t_list: BankTransaction[]) {
+  private draw_mcc_outcome(t_list: BankTransaction[]) {
     // Group transactions by MCC
     const groups = Object.groupBy(
       t_list,
       (t) => t.mcc
     );
-
 
     // Sum negative amounts (outcome) per month
     const data = Object.entries(groups)
@@ -595,13 +776,12 @@ export class BankTransactionsComponent implements OnInit {
     this.cd.detectChanges();
   }
 
-  draw_mcc_income(t_list: BankTransaction[]) {
+  private draw_mcc_income(t_list: BankTransaction[]) {
     // Group transactions by MCC
     const groups = Object.groupBy(
       t_list,
       (t) => t.mcc
     );
-
 
     // Sum positive amounts (income) per month
     const data = Object.entries(groups)
@@ -631,198 +811,16 @@ export class BankTransactionsComponent implements OnInit {
     this.cd.detectChanges();
   }
 
-
-  apply_filter_changes() {
-    const last = this.t_service.last_transactions_filter;
-    if (!last) return;
-
-    const filter: BankTransactionFilter = {
-      ...last,
-      exceptions: this.build_active_exceptions(),
-    };
-    this.t_service.get_transactions(filter).pipe(
-      take(1),
-      tap((t_list) => {
-        this.refill_transactions(t_list);
-      }),
-    ).subscribe();
-  }
-
-  /**
-   * Called whenever a tag toggle button changes state.
-   * Off → adds an AND NOT exception for that tag.
-   * On  → removes the exception.
-   */
-  on_tag_toggle() {
-    this.fetch_with_current_exceptions();
-  }
-
-  /**
-   * Merges the user-defined exceptions with the tag-derived exceptions
-   * and returns the combined list used for every fetch.
-   */
-  private build_active_exceptions(): FilterException[] {
-    const tag_exceptions: FilterException[] = Object.entries(this.selected_tag_map)
-      .filter(([, enabled]) => !enabled)
-      .map(([tag_combo]) => ({
-        combinator: 'AND NOT',
-        conditions: [{field: 'tag', operator: 'eq', value: tag_combo.split("+")[1], severity: tag_combo.split("+")[0]}],
-      } as FilterException));
-
-    return [...this.exceptions, ...tag_exceptions];
-  }
-
-  private fetch_with_current_exceptions() {
-    const last = this.t_service.last_transactions_filter;
-    if (!last) return;
-
-    const filter: BankTransactionFilter = {
-      ...last,
-      exceptions: this.build_active_exceptions(),
-    };
-    this.t_service.get_transactions(filter).pipe(
-      take(1),
-      tap((t_list) => {
-        this.refill_transactions(t_list);
-      }),
-    ).subscribe();
-  }
-
-  private refill_transactions(t_list: BankTransaction[]) {
-    this.transactions = t_list || [];
-    t_list.forEach((t) =>
-      t.tags.forEach((tag) => {
-        const key = tag.severity + '+' + tag.tag;
-        if (!(key in this.selected_tag_map)) {
-          this.selected_tag_map[key] = true;
-        }
-      })
-    );
-    this.on_chart_select(this.chart_idx, t_list);
-    this.cd.detectChanges();
-  }
-
-  open_add_tag_dialog() {
-    if (this.selected_transactions.length === 0) {
-      this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
-      return;
-    }
-    while (this.tag_rows.length > 1) this.tag_rows.removeAt(1);
-    this.tag_rows.at(0).reset({tag: '', severity: 'primary'});
-    this.show_add_tag_dialog = true;
-  }
-
-  open_delete_tag_dialog() {
-    if (this.selected_transactions.length === 0) {
-      this.message.add({severity: 'warn', summary: 'Теги', detail: 'Оберіть хоча б одну транзакцію.'});
-      return;
-    }
-    while (this.delete_tag_rows.length > 1) this.delete_tag_rows.removeAt(1);
-    this.delete_tag_rows.at(0).reset({tag: '', severity: 'primary'});
-    this.show_delete_tag_dialog = true;
-  }
-
-  submit_add_tag() {
-    if (this.batch_tag_form.invalid) return;
-
-    const new_tags: TransactionTag[] = this.batch_tag_form.value.rows as TransactionTag[];
-
-    const payload = this.selected_transactions.map(t => ({
-      idt: t.idt,
-      tags: new_tags,
-    }));
-
-    this.t_service.add_transactions_tags(payload).pipe(
-      take(1),
-      tap((results) => {
-        if (!results || results.length === 0) return;
-
-        // Build a lookup: transaction id → returned tags
-        const tag_map = new Map(results.map(r => [r['idt'], r['tags'] as TransactionTag[]]));
-
-        // Patch tags in place — no refetch needed
-        this.transactions = this.transactions.map(t => {
-          const updated = tag_map.get(t.idt);
-          return updated ? {...t, tags: updated} : t;
-        });
-
-        for (const ntag of new_tags) {
-          this.tags.add(ntag);
-          const key = ntag.severity + '+' + ntag.tag;
-          if (!(key in this.selected_tag_map)) {
-            this.selected_tag_map[key] = true;
-          }
-        }
-        // update unique tag list once after loop
-        this.all_tag_names = [...new Set([...this.tags].map(t => t.tag))];
-        this.tags_suggestions = [...this.all_tag_names];
-
-
-        this.cd.detectChanges();
-        this.show_add_tag_dialog = false;
-        this.message.add({
-          severity: 'success',
-          summary: 'Теги',
-          detail: `${new_tags.length} тег(и) додано до ${results.length} транзакцій.`,
-        });
-      }),
-    ).subscribe();
-  }
-
-  search($event: AutoCompleteCompleteEvent) {
-    const query = ($event.query ?? '').toLowerCase();
-    this.search$.next(query);
-  }
-
-  submit_delete_tag() {
-    if (this.batch_delete_tag_form.invalid) return;
-
-    const tags_to_delete: TransactionTag[] = (this.batch_delete_tag_form.value.rows as {
-      tag: string;
-      severity: string
-    }[])
-      .map(r => ({tag: r.tag, severity: r.severity}));
-
-    const payload = this.selected_transactions.map(t => ({
-      idt: t.idt,
-      tags: tags_to_delete,
-    }));
-
-    this.t_service.delete_transactions_tags(payload).pipe(
-      take(1),
-      tap((results) => {
-        if (!results || results.length === 0) return;
-
-        const tag_map = new Map(results.map(r => [r['idt'], r['tags'] as TransactionTag[]]));
-
-        this.transactions = this.transactions.map(t => {
-          const updated = tag_map.get(t.idt);
-          return updated ? {...t, tags: updated} : t;
-        });
-
-        this.cd.detectChanges();
-        this.show_delete_tag_dialog = false;
-        this.message.add({
-          severity: 'success',
-          summary: 'Теги',
-          detail: `${tags_to_delete.length} тег(и) видалено з ${results.length} транзакцій.`,
-        });
-      }),
-    ).subscribe();
-  }
-
   private draw_tags_income(t_list: BankTransaction[]) {
 
-    const tag_map = new Map<TransactionTag, number>
+    const tag_map = new Map<string, number>
 
-    // this.tags.forEach((tag) => {
-    //   tag_map.set(tag, 0)
-    // });
-    t_list.forEach((trans) => {
-      if (trans.amount > 0) {
-        trans.tags.forEach((tag) => {
-          const current_value = tag_map.get(tag) ?? 0;
-          tag_map.set(tag, current_value + trans.amount)
+    t_list.forEach((tx) => {
+      if (tx.amount > 0) {
+        tx.tags.forEach((tag) => {
+          const key = `${tag.tag}/${tag.severity}`;
+          const current_value = tag_map.get(key) ?? 0;
+          tag_map.set(key, current_value + tx.amount)
         })
       }
     })
@@ -830,7 +828,7 @@ export class BankTransactionsComponent implements OnInit {
     const data = [...tag_map]
       .map(([k, v]) => {
         return {
-          label: `${k.tag}:${k.severity}`,
+          label: k,
           income: Math.abs(v) / 100,  // positive value, UAH
         };
       }).filter((i) => i.income !== 0)
@@ -849,16 +847,14 @@ export class BankTransactionsComponent implements OnInit {
 
   private draw_tags_outcome(t_list: BankTransaction[]) {
 
-    const tag_map = new Map<TransactionTag, number>
+    const tag_map = new Map<string, number>
 
-    // this.tags.forEach((tag) => {
-    //   tag_map.set(tag, 0)
-    // });
-    t_list.forEach((trans) => {
-      if (trans.amount < 0) {
-        trans.tags.forEach((tag) => {
-          const current_value = tag_map.get(tag) ?? 0;
-          tag_map.set(tag, current_value + trans.amount)
+    t_list.forEach((tx) => {
+      if (tx.amount < 0) {
+        tx.tags.forEach((tag) => {
+          const key = `${tag.tag}/${tag.severity}`;
+          const current_value = tag_map.get(key) ?? 0;
+          tag_map.set(key, current_value + tx.amount)
         })
       }
     })
@@ -866,7 +862,7 @@ export class BankTransactionsComponent implements OnInit {
     const data = [...tag_map]
       .map(([k, v]) => {
         return {
-          label: `${k.tag}:${k.severity}`,
+          label: k,
           income: Math.abs(v) / 100,  // positive value, UAH
         };
       }).filter((i) => i.income !== 0)

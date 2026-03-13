@@ -20,13 +20,12 @@
                     (onClick)="open_add_tag_dialog()"/>
           <p-button size="small" pTooltip="Видалити тег" [rounded]="true" [outlined]="true" severity="danger"
                     icon="pi pi-trash" (onClick)="open_delete_tag_dialog()"/>
-          @for (tag of tags; track tag) {
-            @let key = tag.severity + '+' + tag.tag;
+          @for (item of tags_list; track item.key) {
             <p-toggleButton
-              [(ngModel)]="selected_tag_map[key]"
-              [onLabel]="tag.tag"
-              [offLabel]="tag.tag"
-              [style]="tag_toggle_style(tag.severity)"
+              [(ngModel)]="selected_tag_map[item.key]"
+              [onLabel]="item.tag"
+              [offLabel]="item.tag"
+              [style]="tag_toggle_style(item.severity)"
               size="small"
               (onChange)="on_tag_toggle()"/>
           }
@@ -74,7 +73,7 @@
               <td>{{ transaction.mcc_description }}</td>
               <td>
                 @for (tag of transaction.tags; track tag) {
-                  <p-tag class="ml-2" [severity]="$any(tag.severity)" [value]="tag.tag"/>
+                  <p-tag class="m-1" [severity]="$any(tag.severity)" [value]="tag.tag"/>
                 }
               </td>
               <td>{{ to_uk_date(transaction.transaction_time) }}</td>
