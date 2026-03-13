@@ -90,8 +90,8 @@ export interface AccountMonitor {
   iban: string,
   masked_pan: string,
   kind: AccountKind,
-  updated_at: string | null,
-  last_taken_date: string | null,
+  range_end: number | null,
+  range_start: number | null,
   status: AccountMonitorStatus,
 }
 

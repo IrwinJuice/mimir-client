@@ -79,7 +79,7 @@ export class App implements OnInit {
     const two_months_ago = new Date(now);
     two_months_ago.setMonth(two_months_ago.getMonth() - 2);
     const restored = this.load_date_range();
-    this.range_dates = restored ?? [two_months_ago, now];
+    this.range_dates = restored ? [restored[0], now] : [two_months_ago, now];
     this.dt_service.time_range = this.range_dates;
 
     this.web_socket_service.connect().subscribe({
@@ -117,7 +117,7 @@ export class App implements OnInit {
     })
   }
 
-  protected on_range_change(range: [Date, Date]) {
+  on_range_change(range: [Date, Date]) {
     if (range[0] && range[1]) {
       this.dt_service.time_range = this.range_dates;
       this.save_date_range(this.range_dates);

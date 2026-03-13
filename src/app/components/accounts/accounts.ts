@@ -89,8 +89,8 @@ export class Accounts implements OnInit {
     this.cols = [
       {field: 'name', header: 'Аккаунт', width: '300px'},
       {field: 'balance', header: 'Баланс', width: '150px'},
-      {field: 'last_taken_date', header: 'З', width: '100px'},
-      {field: 'updated_at', header: 'По', width: '100px'},
+      {field: 'range_start', header: 'З', width: '100px'},
+      {field: 'range_end', header: 'По', width: '100px'},
       {field: 'iban', header: 'IBAN', width: '250px'},
     ];
 
@@ -105,7 +105,6 @@ export class Accounts implements OnInit {
       .pipe(
         takeUntilDestroyed(this.dr),
         mergeMap((notification) => {
-          console.log('notification', notification)
           const account = this.accounts_tree.find((node) => node.data.ida === notification.ida);
           if (account) {
             const monitor = account.children.find((node) => node.data.external_id === notification.external_id);
@@ -119,8 +118,8 @@ export class Accounts implements OnInit {
                   name: m.masked_pan,
                   loading: m.status === AccountMonitorStatus.PENDING,
                   balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                  updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                  last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  range_end: m.range_end ? DateTime.fromSeconds(m.range_end, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  range_start: m.range_start ? DateTime.fromSeconds(m.range_start, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
                 };
                 this.accounts_tree = [...this.accounts_tree];
                 this.cdr.detectChanges();
@@ -168,8 +167,8 @@ export class Accounts implements OnInit {
                 name: m.masked_pan,
                 loading: m.status === AccountMonitorStatus.PENDING,
                 balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                range_end: m.range_end ? DateTime.fromSeconds(m.range_end, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                range_start: m.range_start ? DateTime.fromSeconds(m.range_start, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
               },
               leaf: true
             });
@@ -317,8 +316,8 @@ export class Accounts implements OnInit {
                   name: m.masked_pan,
                   loading: m.status === AccountMonitorStatus.PENDING,
                   balance: m.balance + ' ' + cc.number(`${m.currency_code}`).code,
-                  updated_at: m.updated_at ? DateTime.fromISO(m.updated_at, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
-                  last_taken_date: m.last_taken_date ? DateTime.fromISO(m.last_taken_date, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  range_end: m.range_end ? DateTime.fromSeconds(m.range_end, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
+                  range_start: m.range_start ? DateTime.fromSeconds(m.range_start, {zone: 'local'}).setLocale("uk-UA").toLocaleString(DateTime.DATETIME_SHORT_WITH_SECONDS) : 'Дані не оновлювались',
                 },
                 leaf: true
               }));
