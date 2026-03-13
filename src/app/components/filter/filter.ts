@@ -4,6 +4,7 @@ import {Select} from 'primeng/select';
 import {InputText} from 'primeng/inputtext';
 import {Tooltip} from 'primeng/tooltip';
 import {Fieldset} from 'primeng/fieldset';
+import {Checkbox} from 'primeng/checkbox';
 import {FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {
   FilterCondition,
@@ -44,6 +45,7 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
     InputText,
     Fieldset,
     Tooltip,
+    Checkbox,
     ReactiveFormsModule,
     AutoComplete,
 
@@ -56,6 +58,9 @@ export class Filter implements OnInit {
   private fb = inject(FormBuilder);
   private t_service = inject(TransactionService);
   private cd = inject(ChangeDetectorRef);
+
+  /** Prevents the ex setter from clearing the form when we ourselves emit. */
+  private _suppress_ex_setter = false;
 
   /**
    * Available severity that can be selected for a tag.
@@ -106,6 +111,7 @@ export class Filter implements OnInit {
    */
   @Input()
   set ex(next: FilterException[]) {
+    if (this._suppress_ex_setter) return;
     this._ex = next;
     this.exceptions.clear();
 
@@ -121,6 +127,7 @@ export class Filter implements OnInit {
             return this.new_condition_group(field, operator, value, severity);
           });
         const group = this.fb.group({
+          enabled: [ex.enabled ?? true],
           combinator: [ex.combinator ?? 'AND NOT'],
           conditions: this.fb.array(conditions),
         });
@@ -252,6 +259,7 @@ export class Filter implements OnInit {
    */
   add_filter_exception() {
     const group = this.fb.group({
+      enabled: [true],
       combinator: ['AND NOT'],
       conditions: this.fb.array([this.new_condition_group()])
     });
@@ -307,25 +315,44 @@ export class Filter implements OnInit {
         const built: FilterCondition[] = conditions
           .map(c => (c as FormGroup).getRawValue())
           .filter(raw => raw.field && raw.operator && raw.value !== '')
-          .map(raw => ({
-            field: (raw.field as FilterField).value,
-            operator: (raw.operator as FilterOperator).value,
-            value: raw.value,
-            severity: (raw.field as FilterField).type === 'tag' ? (raw.severity as Severity)?.value ?? null : null
-          }));
-        return {combinator: group.get('combinator')!.value as string, conditions: built} as FilterException;
+          .map(raw => {
+            // severity may be stored as a Severity object (set programmatically)
+            // or as a plain string (selected via optionValue="value")
+            const raw_sev = raw.severity;
+            const sev_value: string | null =
+              raw_sev == null ? null
+              : typeof raw_sev === 'string' ? raw_sev
+              : (raw_sev as Severity).value ?? null;
+            return {
+              field: (raw.field as FilterField).value,
+              operator: (raw.operator as FilterOperator).value,
+              value: raw.value,
+              severity: (raw.field as FilterField).type === 'tag' ? sev_value : null,
+            };
+          });
+        return {
+          enabled: group.get('enabled')!.value !== false,
+          combinator: group.get('combinator')!.value as string,
+          conditions: built,
+        } as FilterException;
       })
       .filter(ex => ex.conditions.length > 0);
-
   }
 
   /**
    * Persists the current exceptions and emits them to the parent component.
+   * The full list (including disabled groups) is emitted so the parent can
+   * store and restore all groups. The parent is responsible for filtering
+   * disabled groups before passing them to the API.
    */
   apply_exceptions() {
-    const data = this.build_exceptions();
-    this.t_service.save_exceptions_to_storage(data);
-    this.exChange.emit(data);
+    const all_data = this.build_exceptions();
+    this.t_service.save_exceptions_to_storage(all_data);
+    // Suppress the ex setter so the form isn't cleared and rebuilt on the
+    // two-way binding feedback loop caused by [(ex)] in the parent.
+    this._suppress_ex_setter = true;
+    this.exChange.emit(all_data);
+    Promise.resolve().then(() => { this._suppress_ex_setter = false; });
   }
 
   search($event: AutoCompleteCompleteEvent) {

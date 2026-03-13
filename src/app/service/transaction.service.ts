@@ -43,6 +43,7 @@ export interface FilterCondition {
 // One exception = combinator + (cond1 AND cond2 AND ...)
 // combinator examples: 'AND NOT', 'AND', 'OR NOT', 'OR'
 export interface FilterException {
+  enabled?: boolean;   // defaults to true; false = group is saved but skipped
   combinator: string;
   conditions: FilterCondition[];
 }

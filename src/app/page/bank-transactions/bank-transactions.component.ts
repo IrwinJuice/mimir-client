@@ -281,7 +281,7 @@ export class BankTransactionsComponent implements OnInit {
           ida_list: [],
           from,
           to,
-          exceptions: this.exceptions,
+          exceptions: this.build_active_exceptions(),
         }
         return this.t_service.get_transactions(filter)
       }),
@@ -314,7 +314,7 @@ export class BankTransactionsComponent implements OnInit {
           ...this.t_service.last_transactions_filter,
           from,
           to,
-          exceptions: this.exceptions,
+          exceptions: this.build_active_exceptions(),
         };
         this.t_service.last_transactions_filter = filter;
         return this.t_service.get_transactions(filter)
@@ -426,7 +426,8 @@ export class BankTransactionsComponent implements OnInit {
         conditions: [{field: 'tag', operator: 'eq', value: tag_combo.split("+")[1], severity: tag_combo.split("+")[0]}],
       } as FilterException));
 
-    return [...this.exceptions, ...tag_exceptions];
+    const enabled_exceptions = this.exceptions.filter(ex => ex.enabled !== false);
+    return [...enabled_exceptions, ...tag_exceptions];
   }
 
   private fetch_with_current_exceptions() {

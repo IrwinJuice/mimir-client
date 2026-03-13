@@ -6,6 +6,7 @@
           <!-- Group header -->
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
+              <p-checkbox formControlName="enabled" [binary]="true" pTooltip="Увімкнути групу"/>
               <p-select
                 formControlName="combinator"
                 [options]="combinators"
@@ -20,7 +21,9 @@
           </div>
 
           <!-- Conditions rows -->
-          <div formArrayName="conditions" class="flex flex-col gap-2">
+          <div formArrayName="conditions" class="flex flex-col gap-2 transition-opacity"
+               [class.opacity-40]="!exceptions.at(gi).get('enabled')?.value"
+               [class.pointer-events-none]="!exceptions.at(gi).get('enabled')?.value">
             @for (cond of get_conditions(gi).controls; track cond; let ci = $index) {
               <div [formGroupName]="ci" class="flex items-center gap-2">
                 <!-- AND label after first row -->
