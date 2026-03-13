@@ -1,4 +1,4 @@
-<p-fieldset [legend]="'Фільтр (' + exceptions.controls.length + ')'" [collapsed]="true" [toggleable]="true">
+<p-fieldset [legend]="'Фільтр (' + filter_count() + ')'" [collapsed]="true" [toggleable]="true">
   <form [formGroup]="exceptions_form" class="w-full" (submit)="apply_exceptions()">
     <div formArrayName="exceptions" class="flex flex-col gap-3 mt-2">
       @for (group of exceptions.controls; track group; let gi = $index) {

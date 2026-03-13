@@ -321,8 +321,8 @@ export class Filter implements OnInit {
             const raw_sev = raw.severity;
             const sev_value: string | null =
               raw_sev == null ? null
-              : typeof raw_sev === 'string' ? raw_sev
-              : (raw_sev as Severity).value ?? null;
+                : typeof raw_sev === 'string' ? raw_sev
+                  : (raw_sev as Severity).value ?? null;
             return {
               field: (raw.field as FilterField).value,
               operator: (raw.operator as FilterOperator).value,
@@ -352,11 +352,21 @@ export class Filter implements OnInit {
     // two-way binding feedback loop caused by [(ex)] in the parent.
     this._suppress_ex_setter = true;
     this.exChange.emit(all_data);
-    Promise.resolve().then(() => { this._suppress_ex_setter = false; });
+    Promise.resolve().then(() => {
+      this._suppress_ex_setter = false;
+    });
   }
 
   search($event: AutoCompleteCompleteEvent) {
     const query = ($event.query ?? '').toLowerCase();
     this.search$.next(query);
+  }
+
+  filter_count() {
+    const map = this.exceptions
+      .controls
+      .map(control => control.value.enabled)
+      .filter(b => b);
+    return '' + map.length + '/' + this.exceptions.controls.length;
   }
 }
